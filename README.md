@@ -41,8 +41,8 @@ Format a microSD card in FAT32 format and copy the two firmware files onto the c
 
 The memory card will contain:
 
-* rootfs_h20m - The replacement rootfs partition.
-* home_h20m - The replacement home partition.
+* rootfs_h20 - The rootfs partition firmware update.
+* home_h20 - The home firmware firmware update.
 
 **_Note: Both the rootfs and home partitions must be upgraded on the camera. The additional features implemented in the home partition will not work unless the rootfs partition has also been upgraded._**
 
