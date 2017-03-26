@@ -36,6 +36,7 @@ Performance is not degraded as the cameras video/audio feed is not routed throug
 Download a release firmware binaries from Github. Two firmware files are required. One firmware file is for the rootfs partition on the camera whilst the second firmware file is for the home partition on the camera.
 
 Format a microSD card in FAT32 format and copy the two firmware files onto the camera.
+
 **_Note: The microSD card must be formatted in FAT32. exFAT formatted microSD cards will not work._**
 
 The memory card will contain:
@@ -59,7 +60,7 @@ The cameras web interface is directly accessible by entering the IP address of t
 
 If your camera does not have Wifi setup. Pair the camera with your smartphone as per usual using the smartphone app.
 
-![Alt text](web_interface.jpg?raw=true "Web Interface")
+![Alt text](web_interface.png?raw=true "Web Interface")
 
 ## Using the Camera
 
