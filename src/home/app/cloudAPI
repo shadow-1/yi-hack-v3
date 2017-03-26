@@ -1,0 +1,16 @@
+#!/bin/sh
+
+CONF_FILE="/home/app/system.conf"
+
+get_config()
+{
+	key=$1
+	grep $1 $CONF_FILE | cut -d "=" -f2
+}
+                
+if [[ $(get_config PROXYCHAINSNG) == "yes" ]] ; then
+	proxychains4 ./cloudAPI_real "$@"
+else
+	./cloudAPI_real "$@"
+fi
+

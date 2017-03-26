@@ -1,0 +1,8 @@
+/src/busybox/*
+/src/proccgi/*
+/src/proxychains-ng/*
+/src/uClibc/*
+!/src/busybox/.config
+!/src/proccgi/Makefile
+!/src/proxychains-ng/config.mak
+!/src/uClibc/.config

@@ -1,0 +1,23 @@
+body {
+  padding-top: 20px;
+  padding-bottom: 20px;
+}
+
+.navbar {
+  margin-bottom: 20px;
+}
+
+.navbar-inverse .navbar-brand:hover,
+.navbar-inverse .navbar-brand:focus {
+  background-color: transparent;
+  color: #999999;
+}
+
+html, body, form, .container {
+  height: 90%;
+}
+
+textarea.form-control {
+  height: 100%;
+}
+
