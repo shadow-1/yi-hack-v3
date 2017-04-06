@@ -4,10 +4,10 @@ This project is a collection of config files, Makefiles and scripts to allow cus
 
 Currently this project supports:
 * Yi 1080p Dome
+* Yi 1080p Home
 
 However with community support, this firmware can be extended to support at least the following cameras as they are based on the same chipset:
 * Yi Dome
-* Yi 1080p Home v1
 
 ![Alt text](yi-cam.png?raw=true "Yi Cameras")
 
@@ -15,7 +15,7 @@ However with community support, this firmware can be extended to support at leas
 The supported cameras have the following features by default:
 * Wifi
 * Motion detection - a video file is generated if a motion have been detected in the last 60 seconds.
-* Send video data over the network on Chinese servers in the cloud to allow people to view camera data from their smartphone wherever they are.
+* Send video/audio data through a cloud service to allow people to view camera data from their smartphone wherever they are.
 * Setup thanks to a smartphone application.
 * Local video storage on a microSD card
 
@@ -41,8 +41,10 @@ Format a microSD card in FAT32 format and copy the two firmware files onto the c
 
 The memory card will contain:
 
-* rootfs_h20 - The rootfs partition firmware update.
-* home_h20 - The home firmware firmware update.
+| Camera | rootfs partition | home partition | Remarks |
+| --- | --- | --- | --- |
+| **Yi 1080p Dome** | rootfs_h20 | home_h20 | The rootfs partition firmware update. |
+| **Yi 1080p Home** | rootfs_y20 | home_y20 | The home firmware firmware update. |
 
 **_Note: Both the rootfs and home partitions must be upgraded on the camera. The additional features implemented in the home partition will not work unless the rootfs partition has also been upgraded._**
 
@@ -93,4 +95,4 @@ Special thanks to the following projects for their efforts on other Xiaomi camer
 
 **niclet** : https://github.com/niclet/yi-hack-v2
 
-
+**xmflsct** : https://github.com/xmflsct/yi-hack-1080p

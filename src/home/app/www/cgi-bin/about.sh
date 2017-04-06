@@ -78,17 +78,18 @@ cat << EOM3
 			<h1>About yi-hack-v3</h1>
 		</div>
 		
-		<p>Yi-hack-v3 unlocks features not available with the official Yi camera firmware. Major features implemented include:</p>
+		<p>Yi-hack-v3 unlocks features not available with the official Yi camera firmware. Features implemented include:</p>
 		<ul>
 			<li>Telnet Server</li>
 			<li>FTP Server</li>
 			<li>Web Server</li>
 			<li>Proxychains-ng</li>
-			<li>Ability for a shell script to be executed from microSD card automatically upon boot</li>
+			<li>Shell script automatically executed from microSD card automatically upon boot</li>
 		</ul>
 		<p>Yi-hack-v3 currently supports the following cameras:</p>
 		<ul>
 			<li>Yi 1080p Dome</li>
+			<li>Yi 1080p Home</li>
 		</ul>
 	
 		<h2>Version</h2>
