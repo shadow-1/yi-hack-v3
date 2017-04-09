@@ -86,6 +86,7 @@ cat << EOM4
 
 			<input class="btn btn-primary" type="submit" value="Save">
 			<input class="btn btn-primary" type="reset" value="Reset">
+			<a class="btn btn-primary" href="/cgi-bin/test_proxy_config.sh" role="button">Test Config</a>
 		</form>
 	</div>
 

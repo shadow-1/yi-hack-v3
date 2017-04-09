@@ -2,6 +2,7 @@
 /src/proccgi/*
 /src/proxychains-ng/*
 /src/uClibc/*
+/src/home/app/.hackinfo
 !/src/busybox/.config
 !/src/proccgi/Makefile
 !/src/proxychains-ng/config.mak
