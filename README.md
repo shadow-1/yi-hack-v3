@@ -5,11 +5,25 @@ This project is a collection of config files, Makefiles and scripts to allow cus
 Currently this project supports:
 * Yi 1080p Dome
 * Yi 1080p Home
-
-However with community support, this firmware can be extended to support at least the following cameras as they are based on the same chipset:
 * Yi Dome
 
-![Alt text](yi-cam.png?raw=true "Yi Cameras")
+![Alt text](yi-cam.png?raw=true "Supported Yi Cameras")
+
+## Table of Contents
+
+- [Features](#features)
+- [Cameras that are Region Locked to Mainland China](#cameras-that-are-region-locked-to-mainland-china)
+- [Getting Started](#getting-started)
+    - [Prepare the microSD Card](#prepare-the-microsd-card)
+    - [Starting the Camera](#starting-the-camera)
+    - [Configuring the Camera](#configuring-the-camera)
+- [Using the Camera](#using-the-camera)
+    - [Telnet Server](#telnet-server)
+    - [FTP Server](#ftp-server)
+    - [Startup Shell Script](#startup-shell-script)
+    - [Which Version is Installed?](#which-version-is-installed)
+- [Development](#development)
+- [Acknowledgments](#acknowledgments)
 
 ## Features
 The supported cameras have the following features by default:
@@ -43,8 +57,9 @@ The memory card will contain:
 
 | Camera | rootfs partition | home partition | Remarks |
 | --- | --- | --- | --- |
-| **Yi 1080p Dome** | rootfs_h20 | home_h20 | The rootfs partition firmware update. |
-| **Yi 1080p Home** | rootfs_y20 | home_y20 | The home firmware firmware update. |
+| **Yi 1080p Dome** | rootfs_h20 | home_h20 | Firmware files required for the Yi 1080p Dome camera. |
+| **Yi 1080p Home** | rootfs_y20 | home_y20 | Firmware files required for the Yi 1080p Home camera. |
+| **Yi Dome** | rootfs_v201 | home_v201 | Firmware files required for the Yi Dome camera. |
 
 **_Note: Both the rootfs and home partitions must be upgraded on the camera. The additional features implemented in the home partition will not work unless the rootfs partition has also been upgraded._**
 
@@ -96,3 +111,4 @@ Special thanks to the following projects for their efforts on other Xiaomi camer
 **niclet** : https://github.com/niclet/yi-hack-v2
 
 **xmflsct** : https://github.com/xmflsct/yi-hack-1080p
+

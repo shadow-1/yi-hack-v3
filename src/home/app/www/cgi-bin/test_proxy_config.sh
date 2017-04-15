@@ -114,6 +114,9 @@ cat << EOM3
 			<h1>ProxyChains-ng Test</h1>
 		</div>
 
+		<div class="alert alert-warning" role="alert">
+			<strong>Warning!</strong> This test can not determine whether the proxy server supports SSL connections. It is recommended to additionally test the proxy server manually.
+		</div>
 EOM3
 
 if [ "$wget_ret_internet_info" != "0" ]

@@ -90,6 +90,7 @@ cat << EOM3
 		<ul>
 			<li>Yi 1080p Dome</li>
 			<li>Yi 1080p Home</li>
+			<li>Yi Dome</li>
 		</ul>
 	
 		<h2>Version</h2>
