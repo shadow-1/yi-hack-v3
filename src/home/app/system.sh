@@ -17,7 +17,7 @@ if [[ $(get_config TELNETD) == "yes" ]] ; then
 fi
 
 if [[ $(get_config FTPD) == "yes" ]] ; then
-	tcpsvd -vE 0.0.0.0 21 ftpd -w
+	tcpsvd -vE 0.0.0.0 21 ftpd -w &
 fi
 
 /tmp/sd/startup.sh
