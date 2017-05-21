@@ -1,0 +1,266 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+	<meta charset="utf-8">
+	<meta http-equiv="X-UA-Compatible" content="IE=edge">
+	<meta name="viewport" content="width=device-width, initial-scale=1">
+	<!-- The above 3 meta tags *must* come first in the head; any other head content must come *after* these tags -->
+	<script src="/js/lws-common.js"></script>
+	<title></title>
+	<!-- Bootstrap core CSS -->
+	<link href="/css/bootstrap.min.css" rel="stylesheet">
+	<!-- Bootstrap theme -->
+	<link href="/css/bootstrap-theme.min.css" rel="stylesheet">
+	<!-- IE10 viewport hack for Surface/desktop Windows 8 bug -->
+	<link href="/css/ie10-viewport-bug-workaround.css" rel="stylesheet">
+	<!-- Custom styles for this template -->
+	<link href="/css/navbar.css" rel="stylesheet">
+
+</head>
+
+<body>
+
+	<div class="container">
+
+		<!-- Static navbar -->
+		<nav class="navbar navbar-inverse">
+			<div class="container-fluid">
+				<div class="navbar-header">
+					<button type="button" class="navbar-toggle collapsed" data-toggle="collapse" data-target="#navbar" aria-expanded="false" aria-controls="navbar">
+						<span class="sr-only">Toggle navigation</span>
+						<span class="icon-bar"></span>
+						<span class="icon-bar"></span>
+						<span class="icon-bar"></span>
+					</button>
+					<a class="navbar-brand"><div class=camera>Yi Camera</div></a>
+				</div>
+				<div id="navbar" class="navbar-collapse collapse">
+					<ul class="nav navbar-nav">
+						<li><a href="proxy_config.html">ProxyChains-ng</a></li>
+						<li class="active"><a href="config.html">System Config</a></li>
+						<li><a href="about.html">About</a></li>
+						<li><a href="reboot.html">Reboot</a></li>
+					</ul>
+				</div><!--/.nav-collapse -->
+			</div><!--/.container-fluid -->
+		</nav>
+
+		<div class="page-header">
+			<h1>System Configuration</h1>
+		</div>
+		<div id="error"></div>
+		<div id="warning"></div>
+		<div id="information"></div>
+
+		<div class="form-group">
+			<label class="col-sm-3 control-label">ProxyChains-ng Enabled</label>
+			<label class="radio-inline">
+				<input type="radio" name="PROXYCHAINSNG" id="PROXYCHAINSNG_yes" value="yes"> Yes
+			</label>
+			<label class="radio-inline">
+				<input type="radio" name="PROXYCHAINSNG" id="PROXYCHAINSNG_no" value="no"> No
+			</label>
+		</div>
+
+		<div class="form-group">
+			<label class="col-sm-3 control-label">Web Server Enabled</label>
+			<label class="radio-inline">
+				<input type="radio" name="HTTPD" id="HTTPD_yes" value="yes"> Yes
+			</label>
+			<label class="radio-inline">
+				<input type="radio" name="HTTPD" id="HTTPD_no" value="no"> No
+			</label>
+		</div>
+
+		<div class="form-group">
+			<label class="col-sm-3 control-label">Telnet Server Enabled</label>
+			<label class="radio-inline">
+				<input type="radio" name="TELNETD" id="TELNETD_yes" value="yes"> Yes
+			</label>
+			<label class="radio-inline">
+				<input type="radio" name="TELNETD" id="TELNETD_no" value="no"> No
+			</label>
+		</div>
+
+		<div class="form-group">
+			<label class="col-sm-3 control-label">FTP Server Enabled</label>
+			<label class="radio-inline">
+				<input type="radio" name="FTPD" id="FTPD_yes" value="yes"> Yes
+			</label>
+			<label class="radio-inline">
+				<input type="radio" name="FTPD" id="FTPD_no" value="no"> No
+			</label>
+		</div>
+
+		<input class="btn btn-primary" id="apply" type="submit" value="Apply">
+	</div>
+	
+	<!-- Bootstrap core JavaScript
+	================================================== -->
+	<!-- Placed at the end of the document so the pages load faster -->
+	<script src="https://ajax.googleapis.com/ajax/libs/jquery/1.12.4/jquery.min.js"></script>
+	<!--<script>window.jQuery || document.write('<script src="../js/vendor/jquery.min.js"><\/script>')</script>-->
+	<script src="/js/bootstrap.min.js"></script>
+	<!-- IE10 viewport hack for Surface/desktop Windows 8 bug -->
+	<script src="/js/ie10-viewport-bug-workaround.js"></script>
+	
+<script>
+
+document.getElementById('apply').onclick = apply;
+var info_num;
+
+function get_appropriate_ws_url()
+{
+	var pcol;
+	var u = document.URL;
+
+	/*
+	 * We open the websocket encrypted if this page came on an
+	 * https:// url itself, otherwise unencrypted
+	 */
+
+	if (u.substring(0, 5) == "https") {
+		pcol = "wss://";
+		u = u.substr(8);
+	} else {
+		pcol = "ws://";
+		if (u.substring(0, 4) == "http")
+			u = u.substr(7);
+	}
+
+	u = u.split('/');
+
+	/* + "/xxx" bit is for IE10 workaround */
+
+	return pcol + u[0] + "/xxx";
+}
+
+/* yi-hack-v3_info protocol */
+	
+	var socket_info;
+
+	if (typeof MozWebSocket != "undefined") {
+		socket_info = new MozWebSocket(get_appropriate_ws_url(),
+				   "yi-hack-v3_info");
+	} else {
+		socket_info = new WebSocket(get_appropriate_ws_url(),
+				   "yi-hack-v3_info");
+	}
+
+	try {
+		socket_info.onopen = function() {
+			init();
+		} 
+
+		socket_info.onmessage = function got_packet(msg) {
+			jso = JSON.parse(msg.data);
+
+			if (jso.message == "SEND_CAM_INFO") {
+				document.title = jso.camera;
+				
+				document.getElementsByClassName("camera")[0].textContent = jso.camera;
+			} else if (jso.message == "SEND_CONFIG") {
+				if (jso.proxychainsng_enabled == "yes") {
+					document.getElementById("PROXYCHAINSNG_yes").checked = true;
+				} else if (jso.proxychainsng_enabled == "no") {
+					document.getElementById("PROXYCHAINSNG_no").checked = true;
+				}
+
+				if (jso.httpd_enabled == "yes") {
+					document.getElementById("HTTPD_yes").checked = true;
+				} else if (jso.httpd_enabled == "no") {
+					document.getElementById("HTTPD_no").checked = true;
+				}
+
+				if (jso.telnetd_enabled == "yes") {
+					document.getElementById("TELNETD_yes").checked = true;
+				} else if (jso.telnetd_enabled == "no") {
+					document.getElementById("TELNETD_no").checked = true;
+				}
+
+				if (jso.ftpd_enabled == "yes") {
+					document.getElementById("FTPD_yes").checked = true;
+				} else if (jso.ftpd_enabled == "no") {
+					document.getElementById("FTPD_no").checked = true;
+				}
+			} else if (jso.message == "SEND_NOTIFICATION") {
+				var message;
+
+				switch (jso.n_type) {
+					case "0":
+						message = "<div class=\"alert alert-danger\" role=\"alert\"><strong>ERROR:</strong> " + jso.n_message + "</div>";
+						document.getElementById("error").innerHTML += message;
+						break;
+					case "1":
+						message = "<div class=\"alert alert-warning\" role=\"alert\"><strong>WARNING:</strong> " + jso.n_message + "</div>";
+						document.getElementById("error").innerHTML += message;
+						break;
+					case "2":
+						message = "<div class=\"alert alert-success\" role=\"alert\" id=\"" + info_num + "\">" + jso.n_message + "</div>";
+						document.getElementById("information").innerHTML += message;
+						setTimeout(remove_information, 2000, info_num);
+						info_num++;
+						break;
+				}
+			}
+		} 
+
+		socket_info.onclose = function(){
+			
+		}
+	} catch(exception) {
+		alert('<p>Error' + exception);  
+	}
+
+function init() {
+	socket_info.send("SEND_CAM_INFO\n");
+	socket_info.send("SEND_CONFIG\n");
+}
+
+function apply() {
+	var message;
+	var proxychainsng_enabled;
+	var httpd_enabled;
+	var telnetd_enabled;
+	var ftpd_enabled;
+
+	if (document.getElementById("PROXYCHAINSNG_yes").checked == true) {
+		proxychainsng_enabled = "yes";
+	} else {
+		proxychainsng_enabled = "no";
+	}
+	
+	if (document.getElementById("HTTPD_yes").checked == true) {
+		httpd_enabled = "yes";
+	} else {
+		httpd_enabled = "no";
+	}
+	
+	if (document.getElementById("TELNETD_yes").checked == true) {
+		telnetd_enabled = "yes";
+	} else {
+		telnetd_enabled = "no";
+	}
+	
+	if (document.getElementById("FTPD_yes").checked == true) {
+		ftpd_enabled = "yes";
+	} else {
+		ftpd_enabled = "no";
+	}
+	
+	message = "SAVE_CONFIG\nproxychainsng_enabled=" + proxychainsng_enabled + "\nhttpd_enabled=" + httpd_enabled + "\ntelnetd_enabled=" + telnetd_enabled + "\nftpd_enabled=" + ftpd_enabled;
+
+	socket_info.send(message);
+}
+
+function remove_information(x) {
+	var element = document.getElementById(x);
+	element.parentNode.removeChild(element);
+}
+
+</script>
+
+</body>
+
+</html>

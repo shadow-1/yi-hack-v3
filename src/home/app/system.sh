@@ -9,7 +9,7 @@ get_config()
 }
 
 if [[ $(get_config HTTPD) == "yes" ]] ; then
-	httpd
+	lwsws -D
 fi
 
 if [[ $(get_config TELNETD) == "yes" ]] ; then

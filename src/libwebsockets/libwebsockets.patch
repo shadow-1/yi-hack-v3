@@ -1,0 +1,367 @@
+diff -Naur '--exclude=.git' ./libwebsockets/lib/lejp-conf.c ./libwebsockets_yi-hack-v3/lib/lejp-conf.c
+--- ./libwebsockets/lib/lejp-conf.c	2017-05-21 13:50:23.375017000 +0800
++++ ./libwebsockets_yi-hack-v3/lib/lejp-conf.c	2017-05-21 13:55:51.559017000 +0800
+@@ -33,7 +33,9 @@
+ 	"global.uid",
+ 	"global.gid",
+ 	"global.count-threads",
++#ifdef LWS_OPENSSL_SUPPORT
+ 	"global.init-ssl",
++#endif
+ 	"global.server-string",
+ 	"global.plugin-dir",
+ 	"global.ws-pingpong-secs",
+@@ -46,7 +48,9 @@
+ 	LEJPGP_UID,
+ 	LEJPGP_GID,
+ 	LEJPGP_COUNT_THREADS,
++#ifdef LWS_OPENSSL_SUPPORT
+ 	LWJPGP_INIT_SSL,
++#endif
+ 	LEJPGP_SERVER_STRING,
+ 	LEJPGP_PLUGIN_DIR,
+ 	LWJPGP_PINGPONG_SECS,
+@@ -63,9 +67,11 @@
+ 	"vhosts[].interface",
+ 	"vhosts[].unix-socket",
+ 	"vhosts[].sts",
++#ifdef LWS_OPENSSL_SUPPORT
+ 	"vhosts[].host-ssl-key",
+ 	"vhosts[].host-ssl-cert",
+ 	"vhosts[].host-ssl-ca",
++#endif
+ 	"vhosts[].access-log",
+ 	"vhosts[].mounts[].mountpoint",
+ 	"vhosts[].mounts[].origin",
+@@ -85,20 +91,26 @@
+ 	"vhosts[].ws-protocols[].*",
+ 	"vhosts[].ws-protocols[]",
+ 	"vhosts[].keepalive_timeout",
++#ifdef LWS_OPENSSL_SUPPORT
+ 	"vhosts[].enable-client-ssl",
+ 	"vhosts[].ciphers",
++#endif
+ 	"vhosts[].ecdh-curve",
+ 	"vhosts[].noipv6",
+ 	"vhosts[].ipv6only",
++#ifdef LWS_OPENSSL_SUPPORT
+ 	"vhosts[].ssl-option-set",
+ 	"vhosts[].ssl-option-clear",
++#endif
+ 	"vhosts[].mounts[].pmo[].*",
+ 	"vhosts[].headers[].*",
+ 	"vhosts[].headers[]",
++#ifdef LWS_OPENSSL_SUPPORT
+ 	"vhosts[].client-ssl-key",
+ 	"vhosts[].client-ssl-cert",
+ 	"vhosts[].client-ssl-ca",
+ 	"vhosts[].client-ssl-ciphers",
++#endif
+ };
+ 
+ enum lejp_vhost_paths {
+@@ -109,9 +121,11 @@
+ 	LEJPVP_INTERFACE,
+ 	LEJPVP_UNIXSKT,
+ 	LEJPVP_STS,
++#ifdef LWS_OPENSSL_SUPPORT
+ 	LEJPVP_HOST_SSL_KEY,
+ 	LEJPVP_HOST_SSL_CERT,
+ 	LEJPVP_HOST_SSL_CA,
++#endif
+ 	LEJPVP_ACCESS_LOG,
+ 	LEJPVP_MOUNTPOINT,
+ 	LEJPVP_ORIGIN,
+@@ -131,20 +145,26 @@
+ 	LEJPVP_PROTOCOL_NAME,
+ 	LEJPVP_PROTOCOL,
+ 	LEJPVP_KEEPALIVE_TIMEOUT,
++#ifdef LWS_OPENSSL_SUPPORT
+ 	LEJPVP_ENABLE_CLIENT_SSL,
+ 	LEJPVP_CIPHERS,
++#endif
+ 	LEJPVP_ECDH_CURVE,
+ 	LEJPVP_NOIPV6,
+ 	LEJPVP_IPV6ONLY,
++#ifdef LWS_OPENSSL_SUPPORT
+ 	LEJPVP_SSL_OPTION_SET,
+ 	LEJPVP_SSL_OPTION_CLEAR,
++#endif
+ 	LEJPVP_PMO,
+ 	LEJPVP_HEADERS_NAME,
+ 	LEJPVP_HEADERS,
++#ifdef LWS_OPENSSL_SUPPORT
+ 	LEJPVP_CLIENT_SSL_KEY,
+ 	LEJPVP_CLIENT_SSL_CERT,
+ 	LEJPVP_CLIENT_SSL_CA,
+ 	LEJPVP_CLIENT_CIPHERS,
++#endif
+ };
+ 
+ static const char * const parser_errs[] = {
+@@ -180,7 +200,9 @@
+ 	struct lws_context_creation_info *info;
+ 	struct lws_context *context;
+ 	const struct lws_protocols *protocols;
++#ifndef LWS_NO_EXTENSIONS
+ 	const struct lws_extension *extensions;
++#endif
+ 	char *p, *end, valid;
+ 	struct lws_http_mount *head, *last;
+ 
+@@ -191,7 +213,9 @@
+ 	const char **plugin_dirs;
+ 	int count_plugin_dirs;
+ 
++#ifdef LWS_OPENSSL_SUPPORT
+ 	unsigned int enable_client_ssl:1;
++#endif
+ 	unsigned int fresh_mount:1;
+ 	unsigned int any_vhosts:1;
+ };
+@@ -260,10 +284,12 @@
+ 	case LEJPGP_COUNT_THREADS:
+ 		a->info->count_threads = atoi(ctx->buf);
+ 		return 0;
++#ifdef LWS_OPENSSL_SUPPORT
+ 	case LWJPGP_INIT_SSL:
+ 		if (arg_to_bool(ctx->buf))
+ 			a->info->options |= LWS_SERVER_OPTION_DO_SSL_GLOBAL_INIT;
+ 		return 0;
++#endif
+ 	case LEJPGP_SERVER_STRING:
+ 		a->info->server_string = a->p;
+ 		break;
+@@ -317,7 +343,10 @@
+ 		a->info->port = 0;
+ 		a->info->iface = NULL;
+ 		a->info->protocols = a->protocols;
++#ifndef LWS_NO_EXTENSIONS
+ 		a->info->extensions = a->extensions;
++#endif
++#ifdef LWS_OPENSSL_SUPPORT
+ 		a->info->ssl_cert_filepath = NULL;
+ 		a->info->ssl_private_key_filepath = NULL;
+ 		a->info->ssl_ca_filepath = NULL;
+@@ -337,7 +366,9 @@
+ 			"!DHE-RSA-AES256-SHA256:"
+ 			"!AES256-GCM-SHA384:"
+ 			"!AES256-SHA256";
++#endif
+ 		a->info->timeout_secs = 5;
++#ifdef LWS_OPENSSL_SUPPORT
+ 		a->info->ssl_cipher_list = "ECDHE-ECDSA-AES256-GCM-SHA384:"
+ 				       "ECDHE-RSA-AES256-GCM-SHA384:"
+ 				       "DHE-RSA-AES256-GCM-SHA384:"
+@@ -351,13 +382,16 @@
+ 				       "!DHE-RSA-AES256-SHA256:"
+ 				       "!AES256-GCM-SHA384:"
+ 				       "!AES256-SHA256";
++#endif
+ 		a->info->pvo = NULL;
+ 		a->info->headers = NULL;
+ 		a->info->keepalive_timeout = 5;
+ 		a->info->log_filepath = NULL;
+ 		a->info->options &= ~(LWS_SERVER_OPTION_UNIX_SOCK |
+ 				      LWS_SERVER_OPTION_STS);
++#ifdef LWS_OPENSSL_SUPPORT
+ 		a->enable_client_ssl = 0;
++#endif
+ 	}
+ 
+ 	if (reason == LEJPCB_OBJECT_START &&
+@@ -429,12 +463,13 @@
+ 		}
+ 		a->any_vhosts = 1;
+ 
++#ifdef LWS_OPENSSL_SUPPORT
+ 		if (a->enable_client_ssl) {
+ 			const char *cert_filepath = a->info->client_ssl_cert_filepath;
+ 			const char *private_key_filepath = a->info->client_ssl_private_key_filepath;
+ 			const char *ca_filepath = a->info->client_ssl_ca_filepath;
+ 			const char *cipher_list = a->info->client_ssl_cipher_list;
+-			memset(a->info, 0, sizeof(*a->info));
++			memset(a->info, 0, sizeof(*a->info
+ 			a->info->client_ssl_cert_filepath = cert_filepath;
+ 			a->info->client_ssl_private_key_filepath = private_key_filepath;
+ 			a->info->client_ssl_ca_filepath = ca_filepath;
+@@ -442,6 +477,7 @@
+ 			a->info->options = LWS_SERVER_OPTION_DO_SSL_GLOBAL_INIT;
+ 			lws_init_vhost_client_ssl(a->info, vhost);
+ 		}
++#endif
+ 
+ 		return 0;
+ 	}
+@@ -450,11 +486,15 @@
+ 	    ctx->path_match == LEJPVP_MOUNTS + 1) {
+ 		static const char * const mount_protocols[] = {
+ 			"http://",
++#ifdef LWS_OPENSSL_SUPPORT
+ 			"https://",
++#endif
+ 			"file://",
+ 			"cgi://",
+ 			">http://",
++#ifdef LWS_OPENSSL_SUPPORT
+ 			">https://",
++#endif
+ 			"callback://",
+ 			"gzip://",
+ 		};
+@@ -521,6 +561,7 @@
+ 		else
+ 			a->info->options &= ~(LWS_SERVER_OPTION_STS);
+ 		return 0;
++#ifdef LWS_OPENSSL_SUPPORT
+ 	case LEJPVP_HOST_SSL_KEY:
+ 		a->info->ssl_private_key_filepath = a->p;
+ 		break;
+@@ -530,6 +571,7 @@
+ 	case LEJPVP_HOST_SSL_CA:
+ 		a->info->ssl_ca_filepath = a->p;
+ 		break;
++#endif
+ 	case LEJPVP_ACCESS_LOG:
+ 		a->info->log_filepath = a->p;
+ 		break;
+@@ -571,12 +613,14 @@
+ 	case LEJPVP_KEEPALIVE_TIMEOUT:
+ 		a->info->keepalive_timeout = atoi(ctx->buf);
+ 		return 0;
++#ifdef LWS_OPENSSL_SUPPORT
+ 	case LEJPVP_CLIENT_CIPHERS:
+ 		a->info->client_ssl_cipher_list = a->p;
+ 		break;
+ 	case LEJPVP_CIPHERS:
+ 		a->info->ssl_cipher_list = a->p;
+ 		break;
++#endif
+ 	case LEJPVP_ECDH_CURVE:
+ 		a->info->ecdh_curve = a->p;
+ 		break;
+@@ -646,6 +690,7 @@
+ 		a->pvo_int->options = NULL;
+ 		break;
+ 
++#ifdef LWS_OPENSSL_SUPPORT
+ 	case LEJPVP_ENABLE_CLIENT_SSL:
+ 		a->enable_client_ssl = arg_to_bool(ctx->buf);
+ 		return 0;
+@@ -658,6 +703,7 @@
+ 	case LEJPVP_CLIENT_SSL_CA:
+ 		a->info->client_ssl_ca_filepath = a->p;
+ 		break;
++#endif
+ 
+ 	case LEJPVP_NOIPV6:
+ 		if (arg_to_bool(ctx->buf))
+@@ -674,12 +720,14 @@
+ 			a->info->options &= ~(LWS_SERVER_OPTION_IPV6_V6ONLY_VALUE);
+ 		return 0;
+ 
++#ifdef LWS_OPENSSL_SUPPORT
+ 	case LEJPVP_SSL_OPTION_SET:
+ 		a->info->ssl_options_set |= atol(ctx->buf);
+ 		return 0;
+ 	case LEJPVP_SSL_OPTION_CLEAR:
+ 		a->info->ssl_options_clear |= atol(ctx->buf);
+ 		return 0;
++#endif
+ 
+ 	default:
+ 		return 0;
+@@ -890,7 +938,9 @@
+ 	a.valid = 0;
+ 	a.context = context;
+ 	a.protocols = info->protocols;
++#ifndef LWS_NO_EXTENSIONS
+ 	a.extensions = info->extensions;
++#endif
+ 
+ 	lws_snprintf(dd, sizeof(dd) - 1, "%s/conf", d);
+ 	if (lwsws_get_config(&a, dd, paths_vhosts,
+diff -Naur '--exclude=.git' ./libwebsockets/lwsws/main.c ./libwebsockets_yi-hack-v3/lwsws/main.c
+--- ./libwebsockets/lwsws/main.c	2017-05-21 13:50:23.395017000 +0800
++++ ./libwebsockets_yi-hack-v3/lwsws/main.c	2017-05-21 13:54:18.223017000 +0800
+@@ -57,6 +57,7 @@
+ 
+ #define LWSWS_CONFIG_STRING_SIZE (32 * 1024)
+ 
++#ifndef LWS_NO_EXTENSIONS
+ static const struct lws_extension exts[] = {
+ 	{
+ 		"permessage-deflate",
+@@ -65,9 +66,10 @@
+ 	},
+ 	{ NULL, NULL, NULL /* terminator */ }
+ };
++#endif
+ 
+ static const char * const plugin_dirs[] = {
+-	INSTALL_DATADIR"/libwebsockets-test-server/plugins/",
++	"/home/app/lwsws/plugins/",
+ 	NULL
+ };
+ 
+@@ -75,6 +77,9 @@
+ 	{ "help",	no_argument,		NULL, 'h' },
+ 	{ "debug",	required_argument,	NULL, 'd' },
+ 	{ "configdir",  required_argument,	NULL, 'c' },
++#ifndef LWS_NO_DAEMONIZE
++	{ "daemonize", 	no_argument,		NULL, 'D' },
++#endif
+ 	{ NULL, 0, 0, 0 }
+ };
+ 
+@@ -145,7 +150,9 @@
+ 	 * plugins, so we leave it NULL
+ 	 */
+ 
++#ifndef LWS_NO_EXTENSIONS
+ 	info.extensions = exts;
++#endif
+ 
+ 	if (lwsws_get_config_vhosts(context, &info, config_dir,
+ 				    &cs, &cs_len))
+@@ -203,10 +210,13 @@
+ #ifndef _WIN32
+ 	int status, syslog_options = LOG_PID | LOG_PERROR;
+ #endif
++#ifndef LWS_NO_DAEMONIZE
++	int daemonize = 0;
++#endif
+ 
+-	strcpy(config_dir, "/etc/lwsws");
++	strcpy(config_dir, "/home/app/lwsws");
+ 	while (n >= 0) {
+-		n = getopt_long(argc, argv, "hd:c:", options, NULL);
++		n = getopt_long(argc, argv, "hd:c:D", options, NULL);
+ 		if (n < 0)
+ 			continue;
+ 		switch (n) {
+@@ -221,8 +231,24 @@
+ 			fprintf(stderr, "Usage: lwsws [-c <config dir>] "
+ 					"[-d <log bitfield>] [-D] [--help]\n");
+ 			exit(1);
++#ifndef LWS_NO_DAEMONIZE
++		case 'D':
++			daemonize = 1;
++			#ifndef _WIN32
++			syslog_options &= ~LOG_PERROR;
++			#endif
++			break;
++#endif
+ 		}
+ 	}
++	
++#if !defined(LWS_NO_DAEMONIZE) && !defined(WIN32)
++	if (daemonize && lws_daemonize("/tmp/.lwsts-lock")) {
++		fprintf(stderr, "Failed to daemonize\n");
++		return 10;
++	}
++#endif
++
+ #ifndef _WIN32
+ 	/*
+ 	 * We leave our original process up permanently, because that

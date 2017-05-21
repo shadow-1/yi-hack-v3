@@ -1,9 +1,15 @@
 /src/busybox/*
-/src/proccgi/*
 /src/proxychains-ng/*
 /src/uClibc/*
+/src/libuv/*
+/src/libwebsockets/*
+/src/libwebsockets-plugins/*
+/src/home/app/lwsws/plugins/*
 /src/home/app/.hackinfo
 !/src/busybox/.config
 !/src/proccgi/Makefile
 !/src/proxychains-ng/config.mak
 !/src/uClibc/.config
+!/src/libwebsockets/*.patch
+!/src/libwebsockets-plugins/Makefile
+!/src/libwebsockets-plugins/*.c

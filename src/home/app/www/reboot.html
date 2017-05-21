@@ -1,0 +1,196 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+	<meta charset="utf-8">
+	<meta http-equiv="X-UA-Compatible" content="IE=edge">
+	<meta name="viewport" content="width=device-width, initial-scale=1">
+	<!-- The above 3 meta tags *must* come first in the head; any other head content must come *after* these tags -->
+	<meta http-equiv="refresh" content="30;url=/index.html" />
+	<script src="/js/lws-common.js"></script>
+	<title></title>
+	<!-- Bootstrap core CSS -->
+	<link href="/css/bootstrap.min.css" rel="stylesheet">
+	<!-- Bootstrap theme -->
+	<link href="/css/bootstrap-theme.min.css" rel="stylesheet">
+	<!-- IE10 viewport hack for Surface/desktop Windows 8 bug -->
+	<link href="/css/ie10-viewport-bug-workaround.css" rel="stylesheet">
+	<!-- Custom styles for this template -->
+	<link href="/css/navbar.css" rel="stylesheet">
+
+</head>
+
+<body>
+
+	<div class="container">
+
+		<!-- Static navbar -->
+		<nav class="navbar navbar-inverse">
+			<div class="container-fluid">
+				<div class="navbar-header">
+					<button type="button" class="navbar-toggle collapsed" data-toggle="collapse" data-target="#navbar" aria-expanded="false" aria-controls="navbar">
+						<span class="sr-only">Toggle navigation</span>
+						<span class="icon-bar"></span>
+						<span class="icon-bar"></span>
+						<span class="icon-bar"></span>
+					</button>
+					<a class="navbar-brand"><div class=camera>Yi Camera</div></a>
+				</div>
+				<div id="navbar" class="navbar-collapse collapse">
+					<ul class="nav navbar-nav">
+						<li><a href="proxy_config.html">ProxyChains-ng</a></li>
+						<li><a href="config.html">System Config</a></li>
+						<li><a href="about.html">About</a></li>
+						<li class="active"><a href="reboot.html">Reboot</a></li>
+					</ul>
+				</div><!--/.nav-collapse -->
+			</div><!--/.container-fluid -->
+		</nav>
+
+		<div class="page-header">
+			<h1>Reboot Camera</h1>
+		</div>
+		<div class="alert alert-success" role="alert">
+			<Strong>Camera Rebooting.</strong> Refreshing in 30 seconds...
+		</div>
+	</div>
+
+	<!-- Bootstrap core JavaScript
+	================================================== -->
+	<!-- Placed at the end of the document so the pages load faster -->
+	<script src="https://ajax.googleapis.com/ajax/libs/jquery/1.12.4/jquery.min.js"></script>
+	<!--<script>window.jQuery || document.write('<script src="../js/vendor/jquery.min.js"><\/script>')</script>-->
+	<script src="/js/bootstrap.min.js"></script>
+	<!-- IE10 viewport hack for Surface/desktop Windows 8 bug -->
+	<script src="/js/ie10-viewport-bug-workaround.js"></script>
+
+	<script>
+
+var info_num;
+
+function get_appropriate_ws_url()
+{
+	var pcol;
+	var u = document.URL;
+
+	/*
+	 * We open the websocket encrypted if this page came on an
+	 * https:// url itself, otherwise unencrypted
+	 */
+
+	if (u.substring(0, 5) == "https") {
+		pcol = "wss://";
+		u = u.substr(8);
+	} else {
+		pcol = "ws://";
+		if (u.substring(0, 4) == "http")
+			u = u.substr(7);
+	}
+
+	u = u.split('/');
+
+	/* + "/xxx" bit is for IE10 workaround */
+
+	return pcol + u[0] + "/xxx";
+}
+
+/* yi-hack-v3_info protocol */
+	
+	var socket_info;
+
+	if (typeof MozWebSocket != "undefined") {
+		socket_info = new MozWebSocket(get_appropriate_ws_url(),
+				   "yi-hack-v3_info");
+	} else {
+		socket_info = new WebSocket(get_appropriate_ws_url(),
+				   "yi-hack-v3_info");
+	}
+
+	try {
+		socket_info.onopen = function() {
+			init_info();
+		} 
+
+		socket_info.onmessage = function got_packet(msg) {
+			jso = JSON.parse(msg.data);
+
+			if (jso.message == "SEND_CAM_INFO") {
+				document.title = jso.camera;
+				
+				document.getElementsByClassName("camera")[0].innerHTML = jso.camera;
+			} else if (jso.message == "SEND_NOTIFICATION") {
+				var message;
+
+				switch (jso.n_type) {
+					case "0":
+						message = "<div class=\"alert alert-danger\" role=\"alert\"><strong>ERROR:</strong> " + jso.n_message + "</div>";
+						document.getElementById("error").innerHTML += message;
+						break;
+					case "1":
+						message = "<div class=\"alert alert-warning\" role=\"alert\"><strong>WARNING:</strong> " + jso.n_message + "</div>";
+						document.getElementById("error").innerHTML += message;
+						break;
+					case "2":
+						message = "<div class=\"alert alert-success\" role=\"alert\" id=\"" + info_num + "\">" + jso.n_message + "</div>";
+						document.getElementById("information").innerHTML += message;
+						setTimeout(remove_information, 2000, info_num);
+						info_num++;
+						break;
+				}
+			}
+		} 
+
+		socket_info.onclose = function(){
+			
+		}
+	} catch(exception) {
+		alert('<p>Error' + exception);  
+	}
+
+function init_info() {
+	info_num = 0;
+	socket_info.send("SEND_CAM_INFO\n");
+}
+
+function remove_information(x) {
+	var element = document.getElementById(x);
+	element.parentNode.removeChild(element);
+}
+
+/* yi-hack-v3_command protocol */
+	
+	var socket_command;
+
+	if (typeof MozWebSocket != "undefined") {
+		socket_command = new MozWebSocket(get_appropriate_ws_url(),
+				   "yi-hack-v3_command");
+	} else {
+		socket_command = new WebSocket(get_appropriate_ws_url(),
+				   "yi-hack-v3_command");
+	}
+
+	try {
+		socket_command.onopen = function() {
+			init_command();
+		} 
+
+		socket_command.onmessage = function got_packet(msg) {
+			
+		} 
+
+		socket_command.onclose = function(){
+			
+		}
+	} catch(exception) {
+		alert('<p>Error' + exception);  
+	}
+
+function init_command() {
+	socket_command.send("REBOOT\n");
+}
+
+</script>
+	
+</body>
+
+</html>

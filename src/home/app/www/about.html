@@ -1,21 +1,3 @@
-#!/bin/sh
-
-echo "Content-Type: text/html"
-echo ""
-
-BASE_VER="/home/homever"
-HACK_INFO="/home/app/.hackinfo"
-
-get_info()
-{
-	key=$1
-	grep $1 $HACK_INFO | cut -d "=" -f2
-}
-		
-VAR_CAMERA=`get_info "CAMERA"`
-VAR_VERSION=`get_info "VERSION"`
-
-cat << EOM1
 <!DOCTYPE html>
 <html lang="en">
 
@@ -24,21 +6,16 @@ cat << EOM1
 	<meta http-equiv="X-UA-Compatible" content="IE=edge">
 	<meta name="viewport" content="width=device-width, initial-scale=1">
 	<!-- The above 3 meta tags *must* come first in the head; any other head content must come *after* these tags -->
-
-EOM1
-
-echo "	<title>$VAR_CAMERA</title>"
-
-cat << EOM2
-
+	<script src="/js/lws-common.js"></script>
+	<title></title>
 	<!-- Bootstrap core CSS -->
-	<link href="../css/bootstrap.min.css" rel="stylesheet">
+	<link href="/css/bootstrap.min.css" rel="stylesheet">
 	<!-- Bootstrap theme -->
-	<link href="../css/bootstrap-theme.min.css" rel="stylesheet">
+	<link href="/css/bootstrap-theme.min.css" rel="stylesheet">
 	<!-- IE10 viewport hack for Surface/desktop Windows 8 bug -->
-	<link href="../css/ie10-viewport-bug-workaround.css" rel="stylesheet">
+	<link href="/css/ie10-viewport-bug-workaround.css" rel="stylesheet">
 	<!-- Custom styles for this template -->
-	<link href="../css/navbar.css" rel="stylesheet">
+	<link href="/css/navbar.css" rel="stylesheet">
 
 </head>
 
@@ -56,18 +33,14 @@ cat << EOM2
 						<span class="icon-bar"></span>
 						<span class="icon-bar"></span>
 					</button>
-EOM2
-
-echo "					<a class="navbar-brand">$VAR_CAMERA</a>"
-
-cat << EOM3
+					<a class="navbar-brand"><div class=camera>Yi Camera</div></a>
 				</div>
 				<div id="navbar" class="navbar-collapse collapse">
 					<ul class="nav navbar-nav">
-						<li><a href="/cgi-bin/read_proxy_config.sh">ProxyChains-ng</a></li>
-						<li><a href="/cgi-bin/read_config.sh">System Config</a></li>
-						<li class="active"><a href="/cgi-bin/about.sh">About</a></li>
-						<li><a href="/cgi-bin/reboot.sh">Reboot</a></li>
+						<li><a href="proxy_config.html">ProxyChains-ng</a></li>
+						<li><a href="config.html">System Config</a></li>
+						<li class="active"><a href="about.html">About</a></li>
+						<li><a href="reboot.html">Reboot</a></li>
 					</ul>
 				</div><!--/.nav-collapse -->
 			</div><!--/.container-fluid -->
@@ -96,23 +69,11 @@ cat << EOM3
 		<h2>Version</h2>
 		<dl class="dl-horizontal">
 			<dt>Camera</dt>
-EOM3
-
-echo "          <dd>$VAR_CAMERA</dd>"
-
-cat << EOM4
+			<dd><div class=camera></div></dd>
 			<dt>Base Firmware</dt>
-EOM4
-
-echo "         <dd>`cat $BASE_VER`</dd>"
-
-cat << EOM5
+			<dd><div class=base_version></div></dd>
 			<dt>yi-hack-v3 Firmware</dt>
-EOM5
-
-echo "		<dd>$VAR_VERSION</dd>"
-
-cat << EOM6
+			<dd><div class=hack_version></div></dd>
 		</dl>
 		
 		<h2>More Information</h2>
@@ -125,10 +86,85 @@ cat << EOM6
 	<!-- Placed at the end of the document so the pages load faster -->
 	<script src="https://ajax.googleapis.com/ajax/libs/jquery/1.12.4/jquery.min.js"></script>
 	<!--<script>window.jQuery || document.write('<script src="js/vendor/jquery.min.js"><\/script>')</script>-->
-	<script src="../js/bootstrap.min.js"></script>
+	<script src="/js/bootstrap.min.js"></script>
 	<!-- IE10 viewport hack for Surface/desktop Windows 8 bug -->
-	<script src="../js/ie10-viewport-bug-workaround.js"></script>
+	<script src="/js/ie10-viewport-bug-workaround.js"></script>
+
+<script>
+
+function get_appropriate_ws_url()
+{
+	var pcol;
+	var u = document.URL;
+
+	/*
+	 * We open the websocket encrypted if this page came on an
+	 * https:// url itself, otherwise unencrypted
+	 */
+
+	if (u.substring(0, 5) == "https") {
+		pcol = "wss://";
+		u = u.substr(8);
+	} else {
+		pcol = "ws://";
+		if (u.substring(0, 4) == "http")
+			u = u.substr(7);
+	}
+
+	u = u.split('/');
+
+	/* + "/xxx" bit is for IE10 workaround */
+
+	return pcol + u[0] + "/xxx";
+}
+
+/* yi-hack-v3_info protocol */
+	
+	var socket_info;
+
+	if (typeof MozWebSocket != "undefined") {
+		socket_info = new MozWebSocket(get_appropriate_ws_url(),
+				   "yi-hack-v3_info");
+	} else {
+		socket_info = new WebSocket(get_appropriate_ws_url(),
+				   "yi-hack-v3_info");
+	}
+
+	try {
+		socket_info.onopen = function() {
+			init();
+		} 
+
+		socket_info.onmessage = function got_packet(msg) {
+			jso = JSON.parse(msg.data);
+
+			if (jso.message == "SEND_CAM_INFO") {
+				document.title = jso.camera;
+
+				var CameraElements = document.getElementsByClassName("camera");
+
+				for (var i = 0, max = CameraElements.length; i < max; i++) {
+					CameraElements[i].textContent = jso.camera;
+				}
+				
+				document.getElementsByClassName("base_version")[0].textContent = jso.base_version;
+				document.getElementsByClassName("hack_version")[0].textContent = jso.hack_version;
+			}
+		} 
+
+		socket_info.onclose = function(){
+			
+		}
+	} catch(exception) {
+		alert('<p>Error' + exception);  
+	}
+
+function init() {
+	socket_info.send("SEND_CAM_INFO\n");
+}
+
+</script>
+	
 </body>
 
 </html>
-EOM6
