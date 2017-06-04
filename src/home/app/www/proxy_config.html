@@ -57,7 +57,7 @@
 
 		<button type="button" class="btn btn-primary" id="save">Save</button>
 		<button type="button" class="btn btn-primary" id="reset">Reset</button>
-		<a class="btn btn-primary disabled" href="test_proxy_config.html" role="button">Test Config</a>
+		<a class="btn btn-primary" href="test_proxy.html" role="button">Test Config</a>
 	</div>
 
 	<!-- Bootstrap core JavaScript
@@ -158,6 +158,7 @@ function get_appropriate_ws_url()
 
 function init() {
 	info_num = 0;
+	document.getElementById("PROXYCHAINSNG_config").value = "";
 	socket_info.send("SEND_CAM_INFO\n");
 	socket_info.send("SEND_PROXYCHAINSNG_CONFIG\n");
 }

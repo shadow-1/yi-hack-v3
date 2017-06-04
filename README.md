@@ -9,6 +9,16 @@ Currently this project supports:
 
 ![Alt text](yi-cam.png?raw=true "Supported Yi Cameras")
 
+## Acknowledgments
+
+Special thanks to the following projects for their efforts on other Xiaomi cameras and giving inspiration for me to develop and publish my own custom firmware.
+
+**fritz-smh** : https://github.com/fritz-smh/yi-hack
+
+**niclet** : https://github.com/niclet/yi-hack-v2
+
+**xmflsct** : https://github.com/xmflsct/yi-hack-1080p
+
 ## Table of Contents
 
 - [Features](#features)
@@ -24,7 +34,6 @@ Currently this project supports:
     - [Which Version is Installed?](#which-version-is-installed)
 - [Going Back to Stock Firmware](#going-back-to-stock-firmware)
 - [Development](#development)
-- [Acknowledgments](#acknowledgments)
 
 ## Features
 The supported cameras have the following features by default:
@@ -150,13 +159,3 @@ Recovery images have been created to go back to stock firmware. You can download
 
 ## Development
 **TODO**
-
-## Acknowledgments
-
-Special thanks to the following projects for their efforts on other Xiaomi cameras and giving inspiration for me to develop and publish my own custom firmware.
-
-**fritz-smh** : https://github.com/fritz-smh/yi-hack
-
-**niclet** : https://github.com/niclet/yi-hack-v2
-
-**xmflsct** : https://github.com/xmflsct/yi-hack-1080p

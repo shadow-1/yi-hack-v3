@@ -6,6 +6,7 @@
 /src/libwebsockets-plugins/*
 /src/home/app/lwsws/plugins/*
 /src/home/app/.hackinfo
+/build/*
 !/src/busybox/.config
 !/src/proccgi/Makefile
 !/src/proxychains-ng/config.mak

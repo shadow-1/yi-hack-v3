@@ -17,7 +17,10 @@ html, body, form, .container {
   height: 90%;
 }
 
-textarea.form-control {
+#PROXYCHAINSNG_config {
   height: 100%;
 }
 
+#PROXYCHAINSNG_log {
+  height: 20%;
+}
