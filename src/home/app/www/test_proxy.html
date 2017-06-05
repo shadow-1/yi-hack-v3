@@ -64,6 +64,11 @@
 			</thead>
 			<tbody>
 				<tr>
+					<td><strong>Result</strong></td>
+					<td><span class=info_1>&#8213;</span> <span class=info_2>&#8213;</span> <span class=info_3>&#8213;</span></td>
+					<td><span class=proxy_info_1>&#8213;</span> <span class=proxy_info_2>&#8213;</span> <span class=proxy_info_3>&#8213;</span></td>
+				</tr>
+				<tr>
 					<td><strong>Public IP</strong></td>
 					<td><div class=ip></div></td>
 					<td><div class=proxy_ip></div></td>
@@ -207,7 +212,7 @@ function init() {
 
 		socket_test_proxy.onmessage = function got_packet(msg) {
 			jso = JSON.parse(msg.data);
-			
+
 			if (jso.message == "SEND_LOG") {
 				switch (jso.l_type) {
 					case "0":
@@ -224,6 +229,23 @@ function init() {
 						break;
 				}
 			} else if (jso.message == "SEND_INFO") {
+				var c;
+				if (parseInt(jso.return_value) == 0) {
+					c = '\u2714';
+				} else {
+					c = '\u2718';
+				}
+				switch (parseInt(jso.iteration)) {
+					case 1:
+						document.getElementsByClassName("info_1")[0].textContent = c;
+						break;
+					case 2:
+						document.getElementsByClassName("info_2")[0].textContent = c;
+						break;
+					case 3:
+						document.getElementsByClassName("info_3")[0].textContent = c;
+						break;
+				}
 				document.getElementsByClassName("ip")[0].textContent = jso.ip;
 				document.getElementsByClassName("hostname")[0].textContent = jso.hostname;
 				document.getElementsByClassName("city")[0].textContent = jso.city;
@@ -233,6 +255,23 @@ function init() {
 				document.getElementsByClassName("network")[0].textContent = jso.org;
 				document.getElementsByClassName("postal")[0].textContent = jso.postal;
 			} else if (jso.message == "SEND_PROXY_INFO") {
+				var c;
+				if (parseInt(jso.return_value) == 0) {
+					c = '\u2714';
+				} else {
+					c = '\u2718';
+				}
+				switch (parseInt(jso.iteration)) {
+					case 1:
+						document.getElementsByClassName("proxy_info_1")[0].textContent = c;
+						break;
+					case 2:
+						document.getElementsByClassName("proxy_info_2")[0].textContent = c;
+						break;
+					case 3:
+						document.getElementsByClassName("proxy_info_3")[0].textContent = c;
+						break;
+				}
 				document.getElementsByClassName("proxy_ip")[0].textContent = jso.ip;
 				document.getElementsByClassName("proxy_hostname")[0].textContent = jso.hostname;
 				document.getElementsByClassName("proxy_city")[0].textContent = jso.city;

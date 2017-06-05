@@ -6,7 +6,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include  <sys/types.h>
+#include <sys/types.h>
 #include <fcntl.h>
 #include <errno.h>
 #include <sys/wait.h>
@@ -17,6 +17,9 @@
 #define NOTIFICATION_MAX_LENGTH 200
 #define BUFFER_SIZE 10
 #define CHUNK_SIZE 200
+#define NUM_RETRY 3
+#define SUCCESS 0
+#define FAILURE 1
 
 /**
  * Command to run to get current ISP details.
@@ -145,6 +148,24 @@ struct log
 };
 
 /**
+ * Data structure that contains all variables that are needed when sending
+ * information about the test program through WebSocket connection.
+ */
+struct test_info
+{
+	short return_value;
+	short iteration;
+	unsigned char ip[16];
+	unsigned char hostname[64];
+	unsigned char city[32];
+	unsigned char region[32];
+	unsigned char country[4];
+	unsigned char location[32];
+	unsigned char network[128];
+	unsigned char postal[32];
+};
+
+/**
  * Data structure that contains all variables that are stored per plugin instance.
  */
 struct per_vhost_data__yi_hack_v3_test_proxy
@@ -159,12 +180,15 @@ struct per_vhost_data__yi_hack_v3_test_proxy
  */
 struct per_session_data__yi_hack_v3_test_proxy
 {
+	struct lws *wsi;
+
 	enum lws_write_action next_write_action[BUFFER_SIZE];
 	struct log next_log[BUFFER_SIZE];
 	struct notification next_notification[BUFFER_SIZE];
 	int nwa_back, nwa_front, nwa_cur;
 
 	enum test_proxy_state state;
+	struct test_info test_information;
 
 	int outfd[2];
     int infd[2];
@@ -174,14 +198,7 @@ struct per_session_data__yi_hack_v3_test_proxy
 
 	struct lejp_ctx ctx;
 	
-	unsigned char ip[16];
-	unsigned char hostname[64];
-	unsigned char city[32];
-	unsigned char region[32];
-	unsigned char country[4];
-	unsigned char location[32];
-	unsigned char network[128];
-	unsigned char postal[32];
+	short iteration;
 };
 
 struct per_vhost_data__yi_hack_v3_test_proxy *vhd;
@@ -206,28 +223,28 @@ static char test_proxy_cb(struct lejp_ctx *ctx, char reason)
 	switch (ctx->path_match - 1)
 	{
 		case IP:
-			strcpy(pss->ip, ctx->buf);
+			strcpy(pss->test_information.ip, ctx->buf);
 			return 0;
 		case HOSTNAME:
-			strcpy(pss->hostname, ctx->buf);
+			strcpy(pss->test_information.hostname, ctx->buf);
 			return 0;
 		case CITY:
-			strcpy(pss->city, ctx->buf);
+			strcpy(pss->test_information.city, ctx->buf);
 			return 0;
 		case REGION:
-			strcpy(pss->region, ctx->buf);
+			strcpy(pss->test_information.region, ctx->buf);
 			return 0;
 		case COUNTRY:
-			strcpy(pss->country, ctx->buf);
+			strcpy(pss->test_information.country, ctx->buf);
 			return 0;
 		case LOCATION:
-			strcpy(pss->location, ctx->buf);
+			strcpy(pss->test_information.location, ctx->buf);
 			return 0;
 		case NETWORK:
-			strcpy(pss->network, ctx->buf);
+			strcpy(pss->test_information.network, ctx->buf);
 			return 0;
 		case POSTAL:
-			strcpy(pss->postal, ctx->buf);
+			strcpy(pss->test_information.postal, ctx->buf);
 			return 0;
 	}
 }
@@ -266,12 +283,12 @@ void determine_next_action(struct per_vhost_data__yi_hack_v3_test_proxy *vhd
 	// write to the WebSocket before calling the test callback again
 	if (pss->nwa_cur > 0)
 	{
-		lws_callback_on_writable_all_protocol(vhd->context, vhd->protocol);
+		lws_callback_on_writable(pss->wsi);
 	}
 	else if (pss->state != IDLE)
 	{
 		sleep(1);
-		lws_callback_all_protocol(vhd->context, vhd->protocol, LWS_CALLBACK_USER);
+		lws_callback_all_protocol_vhost(vhd->vhost, vhd->protocol, LWS_CALLBACK_USER);
 	}
 }
 
@@ -387,6 +404,7 @@ pid_t execute_process(int infd[], int outfd[], int errfd[], pid_t *pid, char *ar
 		{
 			buffer[count] = '\0';
 
+			// Parse the JSON formatted return value
 			m = (int)(signed char)lejp_parse(&pss->ctx, buffer, count);
 
 			pss->nwa_back++;
@@ -406,28 +424,25 @@ pid_t execute_process(int infd[], int outfd[], int errfd[], pid_t *pid, char *ar
 		// If the child process ended gracefully...
 		if (WIFEXITED(*status))
 		{
-			// if the child process ended with success, send
-			// information through websocket
-			if (WEXITSTATUS(*status) == 0)
+			pss->test_information.return_value = WEXITSTATUS(*status);
+			pss->test_information.iteration = pss->iteration;
+			pss->nwa_back++;
+			switch (pss->state)
 			{
-				pss->nwa_back++;
-				switch (pss->state)
-				{
-					case GET_INFO:
-						pss->next_write_action[pss->nwa_back%BUFFER_SIZE] = SEND_INFO;
-						break;
+				case GET_INFO:
+					pss->next_write_action[pss->nwa_back%BUFFER_SIZE] = SEND_INFO;
+					break;
 
-					case GET_PROXY_INFO:
-						pss->next_write_action[pss->nwa_back%BUFFER_SIZE] =
-								SEND_PROXY_INFO;
-						break;
+				case GET_PROXY_INFO:
+					pss->next_write_action[pss->nwa_back%BUFFER_SIZE] =
+							SEND_PROXY_INFO;
+					break;
 
-					default:
-						break;
-				}
-				pss->nwa_cur++;
+				default:
+					break;
 			}
-			
+			pss->nwa_cur++;
+
 			// Send log with return value through websocket
 			pss->nwa_back++;
 			pss->next_log[pss->nwa_back%BUFFER_SIZE].lt = RETURN;
@@ -472,6 +487,7 @@ void test_proxy(struct per_session_data__yi_hack_v3_test_proxy *pss)
 			//		start the testing process
 			if (pss->pid == 0)
 			{
+				pss->iteration = 1;
 				pss->state = GET_INFO;
 			}
 			// Can only run the test one instance at a time per session
@@ -527,20 +543,29 @@ void test_proxy(struct per_session_data__yi_hack_v3_test_proxy *pss)
 				// If process completed successfully, move onto the next step
 				if (status == 0)
 				{
+					pss->iteration = 1;
 					pss->state = GET_PROXY_INFO;
 				}
-				// Otherwise send error message and abort
 				else
 				{
-					pss->nwa_back++;
-					pss->next_notification[pss->nwa_back%BUFFER_SIZE].nt = ERROR;
-					sprintf(pss->next_notification[pss->nwa_back%BUFFER_SIZE].message,
-							"Could not connect to ipinfo.io, "
-							"ensure that you are connectected to the Internet.\n");
-					pss->next_write_action[pss->nwa_back%BUFFER_SIZE] = SEND_NOTIFICATION;
-					pss->nwa_cur++;
-					lwsl_err(pss->next_notification[pss->nwa_back%BUFFER_SIZE].message);
-					pss->state = IDLE;
+					// If the process failed, retry
+					if (pss->iteration < NUM_RETRY)
+					{
+						pss->iteration++;
+					}
+					// Otherwise send error message and abort
+					else
+					{
+						pss->nwa_back++;
+						pss->next_notification[pss->nwa_back%BUFFER_SIZE].nt = ERROR;
+						sprintf(pss->next_notification[pss->nwa_back%BUFFER_SIZE].message,
+								"Could not connect to ipinfo.io, "
+								"ensure that you are connectected to the Internet.\n");
+						pss->next_write_action[pss->nwa_back%BUFFER_SIZE] = SEND_NOTIFICATION;
+						pss->nwa_cur++;
+						lwsl_err(pss->next_notification[pss->nwa_back%BUFFER_SIZE].message);
+						pss->state = IDLE;
+					}
 				}
 			}
 
@@ -584,23 +609,33 @@ void test_proxy(struct per_session_data__yi_hack_v3_test_proxy *pss)
 				// If process completed successfully, move onto the next step
 				if (status == 0)
 				{
+					pss->iteration = 1;
 					pss->state = CLOSE;
 				}
 				// Otherwise send error message and abort
 				else
 				{
-					pss->nwa_back++;
-					pss->next_notification[pss->nwa_back%BUFFER_SIZE].nt = ERROR;
-					sprintf(pss->next_notification[pss->nwa_back%BUFFER_SIZE].message,
-							"Could not connect to ipinfo.io through ProxyChains-ng, "
-							"ensure that the configured proxy servers are operational.\n");
-					pss->next_write_action[pss->nwa_back%BUFFER_SIZE] = SEND_NOTIFICATION;
-					pss->nwa_cur++;
-					lwsl_err(pss->next_notification[pss->nwa_back%BUFFER_SIZE].message);
-					pss->state = IDLE;
+					// If the process failed, retry
+					if (pss->iteration < NUM_RETRY)
+					{
+						pss->iteration++;
+					}
+					// Otherwise send error message and abort
+					else
+					{
+						pss->nwa_back++;
+						pss->next_notification[pss->nwa_back%BUFFER_SIZE].nt = ERROR;
+						sprintf(pss->next_notification[pss->nwa_back%BUFFER_SIZE].message,
+								"Could not connect to ipinfo.io through ProxyChains-ng, "
+								"ensure that the configured proxy servers are operational.\n");
+						pss->next_write_action[pss->nwa_back%BUFFER_SIZE] = SEND_NOTIFICATION;
+						pss->nwa_cur++;
+						lwsl_err(pss->next_notification[pss->nwa_back%BUFFER_SIZE].message);
+						pss->state = IDLE;
+					}
 				}
 			}
-			
+
 			break;
 
 		case CLOSE:
@@ -648,7 +683,7 @@ int session_read(struct per_vhost_data__yi_hack_v3_test_proxy *vhd
 		if (pss->state == IDLE)
 		{
 			pss->state = INIT;
-			lws_callback_all_protocol(vhd->context, vhd->protocol, LWS_CALLBACK_USER);
+			lws_callback_all_protocol_vhost(vhd->vhost, vhd->protocol, LWS_CALLBACK_USER);
 		}
 		// Can only run the test one instance at a time per session
 		else
@@ -671,13 +706,12 @@ int session_read(struct per_vhost_data__yi_hack_v3_test_proxy *vhd
 
 /**
  * Actions that are taken when writing to the Websocket.
- * @param wsi: Websockets instance.
  * @param vhd: Structure that holds variables that persist across all sessions.
  * @param pss: Structure that holds variables that persist per Websocket session.
  * @param buf: String buffer.
  * @return success or failure.
  */
-int session_write(struct lws *wsi, struct per_vhost_data__yi_hack_v3_test_proxy *vhd,
+int session_write(struct per_vhost_data__yi_hack_v3_test_proxy *vhd,
 		struct per_session_data__yi_hack_v3_test_proxy *pss, char *buf)
 {
 	int n, m;
@@ -688,15 +722,19 @@ int session_write(struct lws *wsi, struct per_vhost_data__yi_hack_v3_test_proxy 
 	{
 		case SEND_INFO:
 			// Prepare to send data in JSON format
-			n = sprintf((char *)buf, "{\n\"message\":\"SEND_INFO\",\n\"ip\":\"%s\",\n"
+			n = sprintf((char *)buf, "{\n\"message\":\"SEND_INFO\",\n"
+					"\"return_value\":\"%d\",\n\"iteration\":\"%d\",\n\"ip\":\"%s\",\n"
 					"\"hostname\":\"%s\",\n\"city\":\"%s\",\n\"region\":\"%s\",\n"
-					"\"country\":\"%s\",\n\"loc\":\"%s\",\n\"org\":\"%s\","
-					"\n\"postal\":\"%s\"\n}"
-					, pss->ip, pss->hostname, pss->city, pss->region, pss->country
-					, pss->location, pss->network, pss->postal);
+					"\"country\":\"%s\",\n\"loc\":\"%s\",\n\"org\":\"%s\",\n"
+					"\"postal\":\"%s\"\n}"
+					, pss->test_information.return_value, pss->test_information.iteration
+					, pss->test_information.ip, pss->test_information.hostname, pss->test_information.city
+					, pss->test_information.region, pss->test_information.country
+					, pss->test_information.location, pss->test_information.network
+					, pss->test_information.postal);
 
 			// Send the data
-			m = lws_write(wsi, buf, n, LWS_WRITE_TEXT);
+			m = lws_write(pss->wsi, buf, n, LWS_WRITE_TEXT);
 			if (m < n)
 			{
 				pss->nwa_back++;
@@ -715,27 +753,31 @@ int session_write(struct lws *wsi, struct per_vhost_data__yi_hack_v3_test_proxy 
 			pss->nwa_front++;
 			pss->nwa_cur--;
 
-			strcpy(pss->ip, "");
-			strcpy(pss->hostname, "");
-			strcpy(pss->city, "");
-			strcpy(pss->region, "");
-			strcpy(pss->country, "");
-			strcpy(pss->location, "");
-			strcpy(pss->network, "");
-			strcpy(pss->postal, "");
+			strcpy(pss->test_information.ip, "");
+			strcpy(pss->test_information.hostname, "");
+			strcpy(pss->test_information.city, "");
+			strcpy(pss->test_information.region, "");
+			strcpy(pss->test_information.country, "");
+			strcpy(pss->test_information.location, "");
+			strcpy(pss->test_information.network, "");
+			strcpy(pss->test_information.postal, "");
 			break;
 
 		case SEND_PROXY_INFO:
 			// Prepare to send data in JSON format
-			n = sprintf((char *)buf, "{\n\"message\":\"SEND_PROXY_INFO\",\n\"ip\":\"%s\""
-					",\n\"hostname\":\"%s\",\n\"city\":\"%s\",\n\"region\":\"%s\",\n"
+			n = sprintf((char *)buf, "{\n\"message\":\"SEND_PROXY_INFO\",\n"
+					"\"return_value\":\"%d\",\n\"iteration\":\"%d\",\n\"ip\":\"%s\",\n"
+					"\"hostname\":\"%s\",\n\"city\":\"%s\",\n\"region\":\"%s\",\n"
 					"\"country\":\"%s\",\n\"loc\":\"%s\",\n\"org\":\"%s\",\n"
 					"\"postal\":\"%s\"\n}"
-					, pss->ip, pss->hostname, pss->city, pss->region, pss->country
-					, pss->location, pss->network, pss->postal);
+					, pss->test_information.return_value, pss->test_information.iteration
+					, pss->test_information.ip, pss->test_information.hostname, pss->test_information.city
+					, pss->test_information.region, pss->test_information.country
+					, pss->test_information.location, pss->test_information.network
+					, pss->test_information.postal);
 
 			// Send the data
-			m = lws_write(wsi, buf, n, LWS_WRITE_TEXT);
+			m = lws_write(pss->wsi, buf, n, LWS_WRITE_TEXT);
 			if (m < n)
 			{
 				pss->nwa_back++;
@@ -754,14 +796,14 @@ int session_write(struct lws *wsi, struct per_vhost_data__yi_hack_v3_test_proxy 
 			pss->nwa_front++;
 			pss->nwa_cur--;
 
-			strcpy(pss->ip, "");
-			strcpy(pss->hostname, "");
-			strcpy(pss->city, "");
-			strcpy(pss->region, "");
-			strcpy(pss->country, "");
-			strcpy(pss->location, "");
-			strcpy(pss->network, "");
-			strcpy(pss->postal, "");
+			strcpy(pss->test_information.ip, "");
+			strcpy(pss->test_information.hostname, "");
+			strcpy(pss->test_information.city, "");
+			strcpy(pss->test_information.region, "");
+			strcpy(pss->test_information.country, "");
+			strcpy(pss->test_information.location, "");
+			strcpy(pss->test_information.network, "");
+			strcpy(pss->test_information.postal, "");
 			break;
 		case SEND_LOG:
 			// Prepare to send data in JSON format
@@ -775,7 +817,7 @@ int session_write(struct lws *wsi, struct per_vhost_data__yi_hack_v3_test_proxy 
 					, temp_string);
 
 			// Send the data
-			m = lws_write(wsi, buf, n, LWS_WRITE_TEXT);
+			m = lws_write(pss->wsi, buf, n, LWS_WRITE_TEXT);
 			if (m < n)
 			{
 				pss->nwa_back++;
@@ -809,7 +851,7 @@ int session_write(struct lws *wsi, struct per_vhost_data__yi_hack_v3_test_proxy 
 					, temp_string);
 
 			// Send the data
-			m = lws_write(wsi, buf, n, LWS_WRITE_TEXT);
+			m = lws_write(pss->wsi, buf, n, LWS_WRITE_TEXT);
 			if (m < n)
 			{
 				pss->nwa_back++;
@@ -836,7 +878,6 @@ int session_write(struct lws *wsi, struct per_vhost_data__yi_hack_v3_test_proxy 
 
 /**
  * yi-hack-v3_test_proxy libwebsockets plugin callback function.
- * @param wsi: Websockets instance.
  * @param reason: The reason why the callback has been executed.
  * @param user: Per session data.
  * @param in: String that contains data sent via Websocket connection.
@@ -873,13 +914,17 @@ callback_yi_hack_v3_test_proxy(struct lws *wsi, enum lws_callback_reasons reason
 			break;
 
 		case LWS_CALLBACK_ESTABLISHED:
+			pss->wsi = wsi;
 			session_init(pss);
 
 			break;
 
 		case LWS_CALLBACK_SERVER_WRITEABLE:
-			session_write(wsi, vhd, pss, buf);
-			determine_next_action(vhd, pss);
+			if (pss->nwa_cur > 0)
+			{
+				session_write(vhd, pss, p);
+				determine_next_action(vhd, pss);
+			}
 
 			break;
 

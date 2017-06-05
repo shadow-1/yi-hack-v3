@@ -30,7 +30,8 @@ struct per_session_data__yi_hack_v3_command
  * @param buf: String buffer.
  * @return success or failure.
  */
-int session_read(struct per_vhost_data__yi_hack_v3_command *vhd, struct per_session_data__yi_hack_v3_command *pss, char *in, char *buf)
+int session_read(struct per_vhost_data__yi_hack_v3_command *vhd
+		, struct per_session_data__yi_hack_v3_command *pss, char *in, char *buf)
 {
 	char *token;
 
@@ -76,7 +77,8 @@ callback_yi_hack_v3_command(struct lws *wsi, enum lws_callback_reasons reason,
 	switch (reason)
 	{
 		case LWS_CALLBACK_PROTOCOL_INIT:
-			vhd = lws_protocol_vh_priv_zalloc(lws_get_vhost(wsi), lws_get_protocol(wsi), sizeof(struct per_vhost_data__yi_hack_v3_command));
+			vhd = lws_protocol_vh_priv_zalloc(lws_get_vhost(wsi), lws_get_protocol(wsi)
+					, sizeof(struct per_vhost_data__yi_hack_v3_command));
 			vhd->context = lws_get_context(wsi);
 			vhd->protocol = lws_get_protocol(wsi);
 			vhd->vhost = lws_get_vhost(wsi);

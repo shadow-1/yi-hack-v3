@@ -80,6 +80,8 @@ struct per_vhost_data__yi_hack_v3_info
  */
 struct per_session_data__yi_hack_v3_info
 {
+	struct lws *wsi;
+
 	enum lws_write_action next_write_action[BUFFER_SIZE];
 	int nwa_back, nwa_front, nwa_cur;
 	struct notification next_notification[BUFFER_SIZE];
@@ -213,7 +215,8 @@ void session_init(struct per_session_data__yi_hack_v3_info *pss)
  * @param buf: String buffer.
  * @return success or failure.
  */
-int session_write(struct lws *wsi, struct per_vhost_data__yi_hack_v3_info *vhd, struct per_session_data__yi_hack_v3_info *pss, char *buf)
+int session_write(struct lws *wsi, struct per_vhost_data__yi_hack_v3_info *vhd,
+		struct per_session_data__yi_hack_v3_info *pss, char *buf)
 {
 	static bool fop_first = true;
 	static lws_fop_fd_t fop_fd;
@@ -230,7 +233,9 @@ int session_write(struct lws *wsi, struct per_vhost_data__yi_hack_v3_info *vhd, 
 		// Send yi-hack-v3 info via the websocket
 		case SEND_CAM_INFO:
 			// Prepare to send data in JSON format
-			n = sprintf((char *)buf, "{\n\"message\":\"SEND_CAM_INFO\",\n\"camera\":\"%s\",\n\"base_version\":\"%s\",\n\"hack_version\":\"%s\"\n}", vhd->camera, vhd->base_version, vhd->hack_version);
+			n = sprintf((char *)buf, "{\n\"message\":\"SEND_CAM_INFO\",\n\"camera\":"
+					"\"%s\",\n\"base_version\":\"%s\",\n\"hack_version\":\"%s\"\n}"
+					,vhd->camera, vhd->base_version, vhd->hack_version);
 
 			// Send the data
 			m = lws_write(wsi, buf, n, LWS_WRITE_TEXT);
@@ -239,7 +244,9 @@ int session_write(struct lws *wsi, struct per_vhost_data__yi_hack_v3_info *vhd, 
 				pss->nwa_back++;
 				pss->next_notification[pss->nwa_back%BUFFER_SIZE].nt = ERROR;
 				pss->next_notification[pss->nwa_back%BUFFER_SIZE].code = errno;
-				sprintf(pss->next_notification[pss->nwa_back%BUFFER_SIZE].message, "ERROR (%d): Error writing to yi-hack-v3_info Websocket.\n", errno);
+				sprintf(pss->next_notification[pss->nwa_back%BUFFER_SIZE].message,
+						"ERROR (%d): Error writing to yi-hack-v3_info Websocket.\n"
+						, errno);
 				pss->next_write_action[pss->nwa_back%BUFFER_SIZE] = SEND_NOTIFICATION;
 				pss->nwa_cur++;
 				lwsl_err(pss->next_notification[pss->nwa_back%BUFFER_SIZE].message);
@@ -254,7 +261,11 @@ int session_write(struct lws *wsi, struct per_vhost_data__yi_hack_v3_info *vhd, 
 		// Send yi-hack-v3 config via the websocket
 		case SEND_CONFIG:
 			// Prepare to send data in JSON format
-			n = sprintf((char *)buf, "{\n\"message\":\"SEND_CONFIG\",\n\"proxychainsng_enabled\":\"%s\",\n\"httpd_enabled\":\"%s\",\n\"telnetd_enabled\":\"%s\",\n\"ftpd_enabled\":\"%s\"\n}", pss->proxychainsng_enabled, pss->httpd_enabled, pss->telnetd_enabled, pss->ftpd_enabled);
+			n = sprintf((char *)buf, "{\n\"message\":\"SEND_CONFIG\",\n\""
+					"proxychainsng_enabled\":\"%s\",\n\"httpd_enabled\":\"%s\""
+					",\n\"telnetd_enabled\":\"%s\",\n\"ftpd_enabled\":\"%s\"\n}"
+					, pss->proxychainsng_enabled, pss->httpd_enabled
+					, pss->telnetd_enabled, pss->ftpd_enabled);
 
 			// Send the data
 			m = lws_write(wsi, buf, n, LWS_WRITE_TEXT);
@@ -263,7 +274,9 @@ int session_write(struct lws *wsi, struct per_vhost_data__yi_hack_v3_info *vhd, 
 				pss->nwa_back++;
 				pss->next_notification[pss->nwa_back%BUFFER_SIZE].nt = ERROR;
 				pss->next_notification[pss->nwa_back%BUFFER_SIZE].code = errno;
-				sprintf(pss->next_notification[pss->nwa_back%BUFFER_SIZE].message, "ERROR (%d): Error writing to yi-hack-v3_info Websocket.\n", errno);
+				sprintf(pss->next_notification[pss->nwa_back%BUFFER_SIZE].message,
+						"ERROR (%d): Error writing to yi-hack-v3_info Websocket.\n"
+						, errno);
 				pss->next_write_action[pss->nwa_back%BUFFER_SIZE] = SEND_NOTIFICATION;
 				pss->nwa_cur++;
 				lwsl_err(pss->next_notification[pss->nwa_back%BUFFER_SIZE].message);
@@ -282,13 +295,16 @@ int session_write(struct lws *wsi, struct per_vhost_data__yi_hack_v3_info *vhd, 
 			if (fop_first)
 			{
 				flags = LWS_O_RDONLY;
-				fop_fd = lws_vfs_file_open(vhd->fops_plat, PROXYCHAINSNG_CONFIG_FILE, &flags);
+				fop_fd = lws_vfs_file_open(vhd->fops_plat, PROXYCHAINSNG_CONFIG_FILE
+						, &flags);
 
 				if (!fop_fd) {
 					pss->nwa_back++;
 					pss->next_notification[pss->nwa_back%BUFFER_SIZE].nt = ERROR;
 					pss->next_notification[pss->nwa_back%BUFFER_SIZE].code = errno;
-					sprintf(pss->next_notification[pss->nwa_back%BUFFER_SIZE].message, "ERROR (%d): Failed to open file - %s.\n", errno, PROXYCHAINSNG_CONFIG_FILE);
+					sprintf(pss->next_notification[pss->nwa_back%BUFFER_SIZE].message
+							, "ERROR (%d): Failed to open file - %s.\n"
+							, errno, PROXYCHAINSNG_CONFIG_FILE);
 					pss->next_write_action[pss->nwa_back%BUFFER_SIZE] = SEND_NOTIFICATION;
 					pss->nwa_cur++;
 					lwsl_err(pss->next_notification[pss->nwa_back%BUFFER_SIZE].message);
@@ -306,7 +322,9 @@ int session_write(struct lws *wsi, struct per_vhost_data__yi_hack_v3_info *vhd, 
 				pss->nwa_back++;
 				pss->next_notification[pss->nwa_back%BUFFER_SIZE].nt = ERROR;
 				pss->next_notification[pss->nwa_back%BUFFER_SIZE].code = errno;
-				sprintf(pss->next_notification[pss->nwa_back%BUFFER_SIZE].message, "ERROR (%d): Failed to read file - %s.\n", errno, PROXYCHAINSNG_CONFIG_FILE);
+				sprintf(pss->next_notification[pss->nwa_back%BUFFER_SIZE].message
+						, "ERROR (%d): Failed to read file - %s.\n"
+						, errno, PROXYCHAINSNG_CONFIG_FILE);
 				pss->next_write_action[pss->nwa_back%BUFFER_SIZE] = SEND_NOTIFICATION;
 				pss->nwa_cur++;
 				lwsl_err(pss->next_notification[pss->nwa_back%BUFFER_SIZE].message);
@@ -318,7 +336,8 @@ int session_write(struct lws *wsi, struct per_vhost_data__yi_hack_v3_info *vhd, 
 			lws_json_purify(temp_string2, temp_string1, 2*CHUNK_SIZE);
 
 			// Prepare to send chunk in JSON format
-			n = sprintf((char *)buf, "{\n\"message\":\"SEND_PROXYCHAINSNG_CONFIG\",\n\"config\":\"%s\"\n}", temp_string2);
+			n = sprintf((char *)buf, "{\n\"message\":\"SEND_PROXYCHAINSNG_CONFIG\",\n\""
+					"config\":\"%s\"\n}", temp_string2);
 
 			// Send the data
 			m = lws_write(wsi, buf, n, LWS_WRITE_TEXT);
@@ -326,7 +345,9 @@ int session_write(struct lws *wsi, struct per_vhost_data__yi_hack_v3_info *vhd, 
 				pss->nwa_back++;
 				pss->next_notification[pss->nwa_back%BUFFER_SIZE].nt = ERROR;
 				pss->next_notification[pss->nwa_back%BUFFER_SIZE].code = errno;
-				sprintf(pss->next_notification[pss->nwa_back%BUFFER_SIZE].message, "ERROR (%d): Error writing to yi-hack-v3_info Websocket.\n", errno);
+				sprintf(pss->next_notification[pss->nwa_back%BUFFER_SIZE].message
+						, "ERROR (%d): Error writing to yi-hack-v3_info Websocket.\n"
+						, errno);
 				pss->next_write_action[pss->nwa_back%BUFFER_SIZE] = SEND_NOTIFICATION;
 				pss->nwa_cur++;
 				lwsl_err(pss->next_notification[pss->nwa_back%BUFFER_SIZE].message);
@@ -348,7 +369,11 @@ int session_write(struct lws *wsi, struct per_vhost_data__yi_hack_v3_info *vhd, 
 		// Send notification via the websocket
 		case SEND_NOTIFICATION:
 			// Prepare to send data in JSON format
-			n = sprintf((char *)buf, "{\n\"message\":\"SEND_NOTIFICATION\",\n\"n_type\":\"%d\",\n\"n_number\":\"%d\",\n\"n_message\":\"%s\"\n}", pss->next_notification[pss->nwa_front%BUFFER_SIZE].nt, pss->next_notification[pss->nwa_front%BUFFER_SIZE].code, pss->next_notification[pss->nwa_front%BUFFER_SIZE].message);
+			n = sprintf((char *)buf, "{\n\"message\":\"SEND_NOTIFICATION\",\n\""
+					"n_type\":\"%d\",\n\"n_number\":\"%d\",\n\"n_message\":\"%s\"\n}"
+					, pss->next_notification[pss->nwa_front%BUFFER_SIZE].nt
+					, pss->next_notification[pss->nwa_front%BUFFER_SIZE].code
+					, pss->next_notification[pss->nwa_front%BUFFER_SIZE].message);
 
 			// Send the data
 			m = lws_write(wsi, buf, n, LWS_WRITE_TEXT);
@@ -357,7 +382,9 @@ int session_write(struct lws *wsi, struct per_vhost_data__yi_hack_v3_info *vhd, 
 				pss->nwa_back++;
 				pss->next_notification[pss->nwa_back%BUFFER_SIZE].nt = ERROR;
 				pss->next_notification[pss->nwa_back%BUFFER_SIZE].code = errno;
-				sprintf(pss->next_notification[pss->nwa_back%BUFFER_SIZE].message, "ERROR (%d): Error writing to yi-hack-v3_info Websocket.\n", errno);
+				sprintf(pss->next_notification[pss->nwa_back%BUFFER_SIZE].message,
+						"ERROR (%d): Error writing to yi-hack-v3_info Websocket.\n"
+						, errno);
 				pss->next_write_action[pss->nwa_back%BUFFER_SIZE] = SEND_NOTIFICATION;
 				pss->nwa_cur++;
 				lwsl_err(pss->next_notification[pss->nwa_back%BUFFER_SIZE].message);
@@ -383,7 +410,8 @@ int session_write(struct lws *wsi, struct per_vhost_data__yi_hack_v3_info *vhd, 
  * @param buf: String buffer.
  * @return success or failure.
  */
-int session_read(struct per_vhost_data__yi_hack_v3_info *vhd, struct per_session_data__yi_hack_v3_info *pss, char *in, char *buf)
+int session_read(struct per_vhost_data__yi_hack_v3_info *vhd,
+		struct per_session_data__yi_hack_v3_info *pss, char *in, char *buf)
 {
 	static lws_fop_fd_t fop_fd;
 	lws_filepos_t fop_len;
@@ -421,7 +449,8 @@ int session_read(struct per_vhost_data__yi_hack_v3_info *vhd, struct per_session
 			pss->nwa_back++;
 			pss->next_notification[pss->nwa_back%BUFFER_SIZE].nt = ERROR;
 			pss->next_notification[pss->nwa_back%BUFFER_SIZE].code = errno;
-			sprintf(pss->next_notification[pss->nwa_back%BUFFER_SIZE].message, "ERROR (%d): Failed to open file - %s.\n", errno, HACK_CONFIG_FILE);
+			sprintf(pss->next_notification[pss->nwa_back%BUFFER_SIZE].message,
+					"ERROR (%d): Failed to open file - %s.\n", errno, HACK_CONFIG_FILE);
 			pss->next_write_action[pss->nwa_back%BUFFER_SIZE] = SEND_NOTIFICATION;
 			pss->nwa_cur++;
 			lwsl_err(pss->next_notification[pss->nwa_back%BUFFER_SIZE].message);
@@ -436,7 +465,8 @@ int session_read(struct per_vhost_data__yi_hack_v3_info *vhd, struct per_session
 			pss->nwa_back++;
 			pss->next_notification[pss->nwa_back%BUFFER_SIZE].nt = ERROR;
 			pss->next_notification[pss->nwa_back%BUFFER_SIZE].code = errno;
-			sprintf(pss->next_notification[pss->nwa_back%BUFFER_SIZE].message, "ERROR (%d): Failed to read file - %s.\n", errno, HACK_CONFIG_FILE);
+			sprintf(pss->next_notification[pss->nwa_back%BUFFER_SIZE].message,
+					"ERROR (%d): Failed to read file - %s.\n", errno, HACK_CONFIG_FILE);
 			pss->next_write_action[pss->nwa_back%BUFFER_SIZE] = SEND_NOTIFICATION;
 			pss->nwa_cur++;
 			lwsl_err(pss->next_notification[pss->nwa_back%BUFFER_SIZE].message);
@@ -578,7 +608,8 @@ int session_read(struct per_vhost_data__yi_hack_v3_info *vhd, struct per_session
 			pss->nwa_back++;
 			pss->next_notification[pss->nwa_back%BUFFER_SIZE].nt = ERROR;
 			pss->next_notification[pss->nwa_back%BUFFER_SIZE].code = errno;
-			sprintf(pss->next_notification[pss->nwa_back%BUFFER_SIZE].message, "ERROR (%d): Failed to open file - %s.\n", errno, HACK_CONFIG_FILE);
+			sprintf(pss->next_notification[pss->nwa_back%BUFFER_SIZE].message,
+					"ERROR (%d): Failed to open file - %s.\n", errno, HACK_CONFIG_FILE);
 			pss->next_write_action[pss->nwa_back%BUFFER_SIZE] = SEND_NOTIFICATION;
 			pss->nwa_cur++;
 			lwsl_err(pss->next_notification[pss->nwa_back%BUFFER_SIZE].message);
@@ -586,14 +617,18 @@ int session_read(struct per_vhost_data__yi_hack_v3_info *vhd, struct per_session
 		}
 
 		// Prepare to save config file
-		n = sprintf((char *)buf, "PROXYCHAINSNG=%s\nHTTPD=%s\nTELNETD=%s\nFTPD=%s", pss->proxychainsng_enabled, pss->httpd_enabled, pss->telnetd_enabled, pss->ftpd_enabled);
+		n = sprintf((char *)buf, "PROXYCHAINSNG=%s\nHTTPD=%s\nTELNETD=%s\nFTPD=%s"
+				, pss->proxychainsng_enabled, pss->httpd_enabled, pss->telnetd_enabled
+				, pss->ftpd_enabled);
 
 		if (n != strlen(buf))
 		{
 			pss->nwa_back++;
 			pss->next_notification[pss->nwa_back%BUFFER_SIZE].nt = ERROR;
 			pss->next_notification[pss->nwa_back%BUFFER_SIZE].code = errno;
-			sprintf(pss->next_notification[pss->nwa_back%BUFFER_SIZE].message, "ERROR (%d): Failed to prepare writing to file - %s.\n", errno, BASE_VERSION_FILE);
+			sprintf(pss->next_notification[pss->nwa_back%BUFFER_SIZE].message,
+					"ERROR (%d): Failed to prepare writing to file - %s.\n", errno
+					, BASE_VERSION_FILE);
 			pss->next_write_action[pss->nwa_back%BUFFER_SIZE] = SEND_NOTIFICATION;
 			pss->nwa_cur++;
 			lwsl_err(pss->next_notification[pss->nwa_back%BUFFER_SIZE].message);
@@ -608,7 +643,8 @@ int session_read(struct per_vhost_data__yi_hack_v3_info *vhd, struct per_session
 			pss->nwa_back++;
 			pss->next_notification[pss->nwa_back%BUFFER_SIZE].nt = ERROR;
 			pss->next_notification[pss->nwa_back%BUFFER_SIZE].code = errno;
-			sprintf(pss->next_notification[pss->nwa_back%BUFFER_SIZE].message, "ERROR (%d): Failed to write file - %s.\n", errno, HACK_CONFIG_FILE);
+			sprintf(pss->next_notification[pss->nwa_back%BUFFER_SIZE].message,
+					"ERROR (%d): Failed to write file - %s.\n", errno, HACK_CONFIG_FILE);
 			pss->next_write_action[pss->nwa_back%BUFFER_SIZE] = SEND_NOTIFICATION;
 			pss->nwa_cur++;
 			lwsl_err(pss->next_notification[pss->nwa_back%BUFFER_SIZE].message);
@@ -620,7 +656,8 @@ int session_read(struct per_vhost_data__yi_hack_v3_info *vhd, struct per_session
 		
 		pss->nwa_back++;
 		pss->next_notification[pss->nwa_back%BUFFER_SIZE].nt = INFORMATION;
-		sprintf(pss->next_notification[pss->nwa_back%BUFFER_SIZE].message, "Settings applied. Reboot is required for changes to take effect.");
+		sprintf(pss->next_notification[pss->nwa_back%BUFFER_SIZE].message,
+				"Settings applied. Reboot is required for changes to take effect.");
 		pss->next_write_action[pss->nwa_back%BUFFER_SIZE] = SEND_NOTIFICATION;
 		pss->nwa_cur++;
 	}
@@ -655,7 +692,8 @@ int session_read(struct per_vhost_data__yi_hack_v3_info *vhd, struct per_session
 		
 		if (current_read_action == OPEN)
 		{
-			// Open the proxychains-ng config file for writing, replacing the file if it exists
+			// Open the proxychains-ng config file for writing,
+			// replacing the file if it exists
 			flags = O_WRONLY | O_TRUNC;
 			fop_fd = lws_vfs_file_open(vhd->fops_plat, PROXYCHAINSNG_CONFIG_FILE, &flags);
 
@@ -664,7 +702,9 @@ int session_read(struct per_vhost_data__yi_hack_v3_info *vhd, struct per_session
 				pss->nwa_back++;
 				pss->next_notification[pss->nwa_back%BUFFER_SIZE].nt = ERROR;
 				pss->next_notification[pss->nwa_back%BUFFER_SIZE].code = errno;
-				sprintf(pss->next_notification[pss->nwa_back%BUFFER_SIZE].message, "ERROR (%d): Failed to open file - %s.\n", errno, PROXYCHAINSNG_CONFIG_FILE);
+				sprintf(pss->next_notification[pss->nwa_back%BUFFER_SIZE].message,
+						"ERROR (%d): Failed to open file - %s.\n", errno
+						, PROXYCHAINSNG_CONFIG_FILE);
 				pss->next_write_action[pss->nwa_back%BUFFER_SIZE] = SEND_NOTIFICATION;
 				pss->nwa_cur++;
 				lwsl_err(pss->next_notification[pss->nwa_back%BUFFER_SIZE].message);
@@ -686,7 +726,9 @@ int session_read(struct per_vhost_data__yi_hack_v3_info *vhd, struct per_session
 				pss->nwa_back++;
 				pss->next_notification[pss->nwa_back%BUFFER_SIZE].nt = ERROR;
 				pss->next_notification[pss->nwa_back%BUFFER_SIZE].code = errno;
-				sprintf(pss->next_notification[pss->nwa_back%BUFFER_SIZE].message, "ERROR (%d): Failed to write file - %s.\n", errno, PROXYCHAINSNG_CONFIG_FILE);
+				sprintf(pss->next_notification[pss->nwa_back%BUFFER_SIZE].message,
+						"ERROR (%d): Failed to write file - %s.\n", errno
+						, PROXYCHAINSNG_CONFIG_FILE);
 				pss->next_write_action[pss->nwa_back%BUFFER_SIZE] = SEND_NOTIFICATION;
 				pss->nwa_cur++;
 				lwsl_err(pss->next_notification[pss->nwa_back%BUFFER_SIZE].message);
@@ -701,7 +743,8 @@ int session_read(struct per_vhost_data__yi_hack_v3_info *vhd, struct per_session
 
 			pss->nwa_back++;
 			pss->next_notification[pss->nwa_back%BUFFER_SIZE].nt = INFORMATION;
-			sprintf(pss->next_notification[pss->nwa_back%BUFFER_SIZE].message, "Configuration saved.");
+			sprintf(pss->next_notification[pss->nwa_back%BUFFER_SIZE].message
+					, "Configuration saved.");
 			pss->next_write_action[pss->nwa_back%BUFFER_SIZE] = SEND_NOTIFICATION;
 			pss->nwa_cur++;
 		}
@@ -732,7 +775,9 @@ callback_yi_hack_v3_info(struct lws *wsi, enum lws_callback_reasons reason,
 	switch (reason)
 	{
 		case LWS_CALLBACK_PROTOCOL_INIT:
-			vhd = lws_protocol_vh_priv_zalloc(lws_get_vhost(wsi), lws_get_protocol(wsi), sizeof(struct per_vhost_data__yi_hack_v3_info));
+			vhd = lws_protocol_vh_priv_zalloc(lws_get_vhost(wsi)
+					, lws_get_protocol(wsi)
+					, sizeof(struct per_vhost_data__yi_hack_v3_info));
 			vhd->context = lws_get_context(wsi);
 			vhd->protocol = lws_get_protocol(wsi);
 			vhd->vhost = lws_get_vhost(wsi);
@@ -749,22 +794,26 @@ callback_yi_hack_v3_info(struct lws *wsi, enum lws_callback_reasons reason,
 			break;
 
 		case LWS_CALLBACK_ESTABLISHED:
+			pss->wsi = wsi;
 			session_init(pss);
 
 			break;
 
 		case LWS_CALLBACK_SERVER_WRITEABLE:
-			session_write(wsi, vhd, pss, buf);
-
 			if (pss->nwa_cur > 0)
-				lws_callback_on_writable_all_protocol(vhd->context, vhd->protocol);
+			{
+				session_write(wsi, vhd, pss, p);
+
+				if (pss->nwa_cur > 0)
+					lws_callback_on_writable(pss->wsi);
+			}
 
 			break;
 
 		case LWS_CALLBACK_RECEIVE:
 			session_read(vhd, pss, (char *)in, p);
 
-			lws_callback_on_writable_all_protocol(vhd->context, vhd->protocol);
+			lws_callback_on_writable(pss->wsi);
 			break;
 
 		default:
