@@ -424,25 +424,6 @@ pid_t execute_process(int infd[], int outfd[], int errfd[], pid_t *pid, char *ar
 		// If the child process ended gracefully...
 		if (WIFEXITED(*status))
 		{
-			pss->test_information.return_value = WEXITSTATUS(*status);
-			pss->test_information.iteration = pss->iteration;
-			pss->nwa_back++;
-			switch (pss->state)
-			{
-				case GET_INFO:
-					pss->next_write_action[pss->nwa_back%BUFFER_SIZE] = SEND_INFO;
-					break;
-
-				case GET_PROXY_INFO:
-					pss->next_write_action[pss->nwa_back%BUFFER_SIZE] =
-							SEND_PROXY_INFO;
-					break;
-
-				default:
-					break;
-			}
-			pss->nwa_cur++;
-
 			// Send log with return value through websocket
 			pss->nwa_back++;
 			pss->next_log[pss->nwa_back%BUFFER_SIZE].lt = RETURN;
@@ -507,7 +488,8 @@ void test_proxy(struct per_session_data__yi_hack_v3_test_proxy *pss)
 			}
 
 		case GET_INFO:
-			lejp_construct(&pss->ctx, test_proxy_cb, pss, proxy_json, ARRAY_SIZE(proxy_json));
+			lejp_construct(&pss->ctx, test_proxy_cb, pss, proxy_json,
+					ARRAY_SIZE(proxy_json));
 			rv = execute_process(pss->infd, pss->outfd, pss->errfd, &pss->pid
 					, args_get_info, &status, pss);
 
@@ -539,10 +521,18 @@ void test_proxy(struct per_session_data__yi_hack_v3_test_proxy *pss)
 				pss->errfd[0] = 0;
 				pss->errfd[1] = 0;
 				pss->pid = 0;
-				
+
+				// Get return value, interation and send through WebSocket connection
+				pss->test_information.return_value = WEXITSTATUS(status);
+				pss->test_information.iteration = pss->iteration;
+
+				pss->nwa_back++;
+				pss->next_write_action[pss->nwa_back%BUFFER_SIZE] = SEND_INFO;
+				pss->nwa_cur++;
+
 				// If process completed successfully, move onto the next step
 				if (status == 0)
-				{
+				{					
 					pss->iteration = 1;
 					pss->state = GET_PROXY_INFO;
 				}
@@ -561,9 +551,11 @@ void test_proxy(struct per_session_data__yi_hack_v3_test_proxy *pss)
 						sprintf(pss->next_notification[pss->nwa_back%BUFFER_SIZE].message,
 								"Could not connect to ipinfo.io, "
 								"ensure that you are connectected to the Internet.\n");
-						pss->next_write_action[pss->nwa_back%BUFFER_SIZE] = SEND_NOTIFICATION;
+						pss->next_write_action[pss->nwa_back%BUFFER_SIZE] =
+								SEND_NOTIFICATION;
 						pss->nwa_cur++;
-						lwsl_err(pss->next_notification[pss->nwa_back%BUFFER_SIZE].message);
+						lwsl_err(pss->next_notification[pss->nwa_back%BUFFER_SIZE]
+								.message);
 						pss->state = IDLE;
 					}
 				}
@@ -606,9 +598,35 @@ void test_proxy(struct per_session_data__yi_hack_v3_test_proxy *pss)
 				pss->errfd[1] = 0;
 				pss->pid = 0;
 
+				// Get return value, interation and send through WebSocket connection
+				pss->test_information.return_value = WEXITSTATUS(status);
+				pss->test_information.iteration = pss->iteration;
+
+				pss->nwa_back++;
+				pss->next_write_action[pss->nwa_back%BUFFER_SIZE] = SEND_PROXY_INFO;
+				pss->nwa_cur++;
+
 				// If process completed successfully, move onto the next step
 				if (status == 0)
-				{
+				{				
+					// If the detected country is not Mainland China,
+					// fail the test and send a warning through the WebSocket connection
+					if (strcmp(pss->test_information.country, "CN"))
+					{
+						pss->test_information.return_value = 1;
+
+						pss->nwa_back++;
+						pss->next_notification[pss->nwa_back%BUFFER_SIZE].nt = WARNING;
+						sprintf(pss->next_notification[pss->nwa_back%BUFFER_SIZE].message,
+							"ProxyChains-ng configuration appears to contain at least "
+							"one proxy server that is located outside Mainland China. "
+							"Ensure all configured proxy servers are located within "
+							"Mainland China.");
+						pss->next_write_action[pss->nwa_back%BUFFER_SIZE] =
+								SEND_NOTIFICATION;
+						pss->nwa_cur++;
+					}
+
 					pss->iteration = 1;
 					pss->state = CLOSE;
 				}
@@ -741,7 +759,7 @@ int session_write(struct per_vhost_data__yi_hack_v3_test_proxy *vhd,
 				pss->next_notification[pss->nwa_back%BUFFER_SIZE].nt = ERROR;
 				pss->next_notification[pss->nwa_back%BUFFER_SIZE].code = errno;
 				sprintf(pss->next_notification[pss->nwa_back%BUFFER_SIZE].message,
-						"ERROR (%d): Error writing to yi-hack-v3_info Websocket.\n"
+						"ERROR (%d): Error writing to yi-hack-v3_test_proxy Websocket.\n"
 						, errno);
 				pss->next_write_action[pss->nwa_back%BUFFER_SIZE] = SEND_NOTIFICATION;
 				pss->nwa_cur++;
@@ -843,7 +861,6 @@ int session_write(struct per_vhost_data__yi_hack_v3_test_proxy *vhd,
 					pss->next_notification[pss->nwa_front%BUFFER_SIZE].message
 					, 2*CHUNK_SIZE);
 
-			// Prepare to send data in JSON format
 			n = sprintf((char *)buf, "{\n\"message\":\"SEND_NOTIFICATION\",\n\""
 					"n_type\":\"%d\",\n\"n_number\":\"%d\",\n\"n_message\":\"%s\"\n}"
 					, pss->next_notification[pss->nwa_front%BUFFER_SIZE].nt
@@ -858,7 +875,7 @@ int session_write(struct per_vhost_data__yi_hack_v3_test_proxy *vhd,
 				pss->next_notification[pss->nwa_back%BUFFER_SIZE].nt = ERROR;
 				pss->next_notification[pss->nwa_back%BUFFER_SIZE].code = errno;
 				sprintf(pss->next_notification[pss->nwa_back%BUFFER_SIZE].message,
-						"ERROR (%d): Error writing to yi-hack-v3_info Websocket.\n"
+						"ERROR (%d): Error writing to yi-hack-v3_test_proxy Websocket.\n"
 						, errno);
 				pss->next_write_action[pss->nwa_back%BUFFER_SIZE] = SEND_NOTIFICATION;
 				pss->nwa_cur++;
