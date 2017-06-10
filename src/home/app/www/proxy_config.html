@@ -57,7 +57,9 @@
 
 		<button type="button" class="btn btn-primary" id="save">Save</button>
 		<button type="button" class="btn btn-primary" id="reset">Reset</button>
-		<a class="btn btn-primary" href="test_proxy.html" role="button">Test Config</a>
+		<a class="btn btn-primary" href="test_proxy_config.html" role="button">Test Config</a>
+		<a class="btn btn-primary disabled" href="test_proxy_list.html" role="button">Test Proxy List</a>
+		<a class="btn btn-primary disabled" href="download_proxy_list.html" role="button">Download Proxy List</a>
 	</div>
 
 	<!-- Bootstrap core JavaScript
@@ -184,8 +186,6 @@ function save() {
 
 		if(i == 0) {
 			message += "OPEN\n";
-		} else if (i == chunks.length - 1) {
-			message += "CLOSE\n"
 		} else {
 			message += "APPEND\n";
 		}
@@ -194,6 +194,7 @@ function save() {
 
 		socket_info.send(message);
 	}
+	socket_info.send("SAVE_PROXYCHAINSNG_CONFIG\nCLOSE\n");
 }
 
 function reset() {

@@ -1,5 +1,5 @@
-
-sts": [ {
+{
+ "vhosts": [ {
      "name": "localhost",
      "port": "80",
      "access-log": "/tmp/yi-hack-v3_lwsws-log",
@@ -23,6 +23,9 @@ sts": [ {
          "status": "ok"
        },
        "yi-hack-v3_command": {
+         "status": "ok"
+       },
+       "yi-hack-v3_test_proxy": {
          "status": "ok"
        }
      }]

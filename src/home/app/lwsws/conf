@@ -8,6 +8,6 @@
    "gid": "0",
    "count-threads": "1",
    "server-string": "lwsws",
-   "ws-pingpong-secs": "200",
+   "ws-pingpong-secs": "200"
  }
 }

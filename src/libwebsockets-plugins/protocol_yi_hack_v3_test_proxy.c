@@ -10,6 +10,7 @@
 #include <fcntl.h>
 #include <errno.h>
 #include <sys/wait.h>
+#include <math.h>
 
 /**
  * Constants used in the plugin.
@@ -89,7 +90,8 @@ enum lws_write_action
 	SEND_INFO,
 	SEND_PROXY_INFO,
 	SEND_LOG,
-	SEND_NOTIFICATION
+	SEND_NOTIFICATION,
+	SEND_PROGRESS
 };
 
 /**
@@ -111,6 +113,16 @@ enum log_type
 	STDOUT,
 	STDERR,
 	RETURN
+};
+
+/**
+ * Enumeration of possible types of tests that can be performed.
+ */
+enum test_type
+{
+	TEST_CONFIG,
+	TEST_LIST,
+	DOWNLOAD_LIST
 };
 
 /**
@@ -187,6 +199,7 @@ struct per_session_data__yi_hack_v3_test_proxy
 	struct notification next_notification[BUFFER_SIZE];
 	int nwa_back, nwa_front, nwa_cur;
 
+	enum test_type type;
 	enum test_proxy_state state;
 	struct test_info test_information;
 
@@ -197,8 +210,11 @@ struct per_session_data__yi_hack_v3_test_proxy
 	pid_t pid;
 
 	struct lejp_ctx ctx;
-	
+
 	short iteration;
+
+	unsigned char progress;
+	unsigned char progress_num;
 };
 
 struct per_vhost_data__yi_hack_v3_test_proxy *vhd;
@@ -255,8 +271,6 @@ static char test_proxy_cb(struct lejp_ctx *ctx, char reason)
  */
 void session_init(struct per_session_data__yi_hack_v3_test_proxy *pss)
 {
-	int i;
-	
 	pss->nwa_back = -1;
 	pss->nwa_front = 0;
 	pss->nwa_cur = 0;
@@ -376,7 +390,7 @@ pid_t execute_process(int infd[], int outfd[], int errfd[], pid_t *pid, char *ar
 		}
 	}
 
-	// Read stderr pipe.
+	// Read stderr pipe
 	do
 	{
 		count = read(errfd[0], buffer, sizeof(buffer)-1);
@@ -456,7 +470,7 @@ pid_t execute_process(int infd[], int outfd[], int errfd[], pid_t *pid, char *ar
  * based on the current state.
  * @param pss: Structure that holds variables that persist per Websocket session.
  */
-void test_proxy(struct per_session_data__yi_hack_v3_test_proxy *pss)
+void test_config(struct per_session_data__yi_hack_v3_test_proxy *pss)
 {
 	pid_t rv;
 	int status;
@@ -465,11 +479,17 @@ void test_proxy(struct per_session_data__yi_hack_v3_test_proxy *pss)
 	{
 		case INIT:
 			// If an instance of the test is not currently running,
-			//		start the testing process
+			// start the testing process
 			if (pss->pid == 0)
 			{
 				pss->iteration = 1;
+				pss->progress = 1;
+				pss->progress_num = 8;
 				pss->state = GET_INFO;
+
+				pss->nwa_back++;
+				pss->next_write_action[pss->nwa_back%BUFFER_SIZE] = SEND_PROGRESS;
+				pss->nwa_cur++;
 			}
 			// Can only run the test one instance at a time per session
 			else
@@ -486,6 +506,8 @@ void test_proxy(struct per_session_data__yi_hack_v3_test_proxy *pss)
 				lwsl_err(pss->next_notification[pss->nwa_back%BUFFER_SIZE].message);
 				return;
 			}
+
+			break;
 
 		case GET_INFO:
 			lejp_construct(&pss->ctx, test_proxy_cb, pss, proxy_json,
@@ -522,6 +544,12 @@ void test_proxy(struct per_session_data__yi_hack_v3_test_proxy *pss)
 				pss->errfd[1] = 0;
 				pss->pid = 0;
 
+				// Send current progress
+				pss->progress = pss->iteration + 1;
+				pss->nwa_back++;
+				pss->next_write_action[pss->nwa_back%BUFFER_SIZE] = SEND_PROGRESS;
+				pss->nwa_cur++;
+
 				// Get return value, interation and send through WebSocket connection
 				pss->test_information.return_value = WEXITSTATUS(status);
 				pss->test_information.iteration = pss->iteration;
@@ -532,7 +560,13 @@ void test_proxy(struct per_session_data__yi_hack_v3_test_proxy *pss)
 
 				// If process completed successfully, move onto the next step
 				if (status == 0)
-				{					
+				{
+					// Half way through the test
+					pss->progress = 4;
+					pss->nwa_back++;
+					pss->next_write_action[pss->nwa_back%BUFFER_SIZE] = SEND_PROGRESS;
+					pss->nwa_cur++;
+
 					pss->iteration = 1;
 					pss->state = GET_PROXY_INFO;
 				}
@@ -556,7 +590,7 @@ void test_proxy(struct per_session_data__yi_hack_v3_test_proxy *pss)
 						pss->nwa_cur++;
 						lwsl_err(pss->next_notification[pss->nwa_back%BUFFER_SIZE]
 								.message);
-						pss->state = IDLE;
+						pss->state = CLOSE;
 					}
 				}
 			}
@@ -598,6 +632,12 @@ void test_proxy(struct per_session_data__yi_hack_v3_test_proxy *pss)
 				pss->errfd[1] = 0;
 				pss->pid = 0;
 
+				// Send current progress
+				pss->progress = pss->iteration + 4;
+				pss->nwa_back++;
+				pss->next_write_action[pss->nwa_back%BUFFER_SIZE] = SEND_PROGRESS;
+				pss->nwa_cur++;
+
 				// Get return value, interation and send through WebSocket connection
 				pss->test_information.return_value = WEXITSTATUS(status);
 				pss->test_information.iteration = pss->iteration;
@@ -608,7 +648,13 @@ void test_proxy(struct per_session_data__yi_hack_v3_test_proxy *pss)
 
 				// If process completed successfully, move onto the next step
 				if (status == 0)
-				{				
+				{
+					// About 90% through the test, only cleanup to go
+					pss->progress = 7;
+					pss->nwa_back++;
+					pss->next_write_action[pss->nwa_back%BUFFER_SIZE] = SEND_PROGRESS;
+					pss->nwa_cur++;
+
 					// If the detected country is not Mainland China,
 					// fail the test and send a warning through the WebSocket connection
 					if (strcmp(pss->test_information.country, "CN"))
@@ -649,7 +695,7 @@ void test_proxy(struct per_session_data__yi_hack_v3_test_proxy *pss)
 						pss->next_write_action[pss->nwa_back%BUFFER_SIZE] = SEND_NOTIFICATION;
 						pss->nwa_cur++;
 						lwsl_err(pss->next_notification[pss->nwa_back%BUFFER_SIZE].message);
-						pss->state = IDLE;
+						pss->state = CLOSE;
 					}
 				}
 			}
@@ -658,7 +704,13 @@ void test_proxy(struct per_session_data__yi_hack_v3_test_proxy *pss)
 
 		case CLOSE:
 			pss->state = IDLE;
-			
+
+			// Finished the test
+			pss->progress = 8;
+			pss->nwa_back++;
+			pss->next_write_action[pss->nwa_back%BUFFER_SIZE] = SEND_PROGRESS;
+			pss->nwa_cur++;
+
 			pss->nwa_back++;
 			pss->next_notification[pss->nwa_back%BUFFER_SIZE].nt = INFORMATION;
 			sprintf(pss->next_notification[pss->nwa_back%BUFFER_SIZE].message,
@@ -695,29 +747,42 @@ int session_read(struct per_vhost_data__yi_hack_v3_test_proxy *vhd
 		return -1;
 	}
 
-	// Received request to test current proxy config
-	if (strcmp(token, "TEST_PROXY") == 0)
+	// Received valid request
+	if (strcmp(token, "TEST_CONFIG") == 0 || strcmp(token, "TEST_LIST") == 0 ||
+			strcmp(token, "DOWNLOAD_LIST") == 0)
 	{
-		if (pss->state == IDLE)
-		{
-			pss->state = INIT;
-			lws_callback_all_protocol_vhost(vhd->vhost, vhd->protocol, LWS_CALLBACK_USER);
-		}
-		// Can only run the test one instance at a time per session
-		else
+		// Can only run one test at a time per session
+		if (pss->state != IDLE)
 		{
 			pss->nwa_back++;
 			pss->next_notification[pss->nwa_back%BUFFER_SIZE].nt = ERROR;
 			pss->next_notification[pss->nwa_back%BUFFER_SIZE].code = errno;
 			sprintf(pss->next_notification[pss->nwa_back%BUFFER_SIZE].message
-					, "ERROR: Already started testing proxy. Can not run more than one instance at a time.\n"
+					, "ERROR: Already started testing proxy. "
+					"Can not run more than one instance at a time.\n"
 					, errno);
 			pss->next_write_action[pss->nwa_back%BUFFER_SIZE] = SEND_NOTIFICATION;
 			pss->nwa_cur++;
 			lwsl_err(pss->next_notification[pss->nwa_back%BUFFER_SIZE].message);
 			return -1;
 		}
-		
+
+		// Set the appropriate test to be performed
+		if (strcmp(token, "TEST_CONFIG") == 0)
+		{
+			pss->type = TEST_CONFIG;
+		}
+		else if (strcmp(token, "TEST_LIST") == 0)
+		{
+			pss->type = TEST_LIST;
+		}
+		else if (strcmp(token, "DOWNLOAD_LIST") == 0)
+		{
+			pss->type = DOWNLOAD_LIST;
+		}
+
+		pss->state = INIT;
+		lws_callback_all_protocol_vhost(vhd->vhost, vhd->protocol, LWS_CALLBACK_USER);
 	}
 	return 0;
 }
@@ -733,6 +798,7 @@ int session_write(struct per_vhost_data__yi_hack_v3_test_proxy *vhd,
 		struct per_session_data__yi_hack_v3_test_proxy *pss, char *buf)
 {
 	int n, m;
+	float f;
 	char temp_string[2*CHUNK_SIZE];
 	
 	// Send the next message in the FIFO action buffer
@@ -887,6 +953,33 @@ int session_write(struct per_vhost_data__yi_hack_v3_test_proxy *vhd,
 			pss->nwa_front++;
 			pss->nwa_cur--;
 			break;
+
+		case SEND_PROGRESS:
+			f = ceil((float)pss->progress/pss->progress_num * 100);
+
+			// Prepare to send data in JSON format
+			n = sprintf((char *)buf, "{\n\"message\":\"SEND_PROGRESS\",\n"
+					"\"percentage\":\"%d\"\n}", (int)f);
+
+			// Send the data
+			m = lws_write(pss->wsi, buf, n, LWS_WRITE_TEXT);
+			if (m < n)
+			{
+				pss->nwa_back++;
+				pss->next_notification[pss->nwa_back%BUFFER_SIZE].nt = ERROR;
+				pss->next_notification[pss->nwa_back%BUFFER_SIZE].code = errno;
+				sprintf(pss->next_notification[pss->nwa_back%BUFFER_SIZE].message,
+						"ERROR (%d): Error writing to yi-hack-v3_test_proxy Websocket.\n"
+						, errno);
+				pss->next_write_action[pss->nwa_back%BUFFER_SIZE] = SEND_NOTIFICATION;
+				pss->nwa_cur++;
+				lwsl_err(pss->next_notification[pss->nwa_back%BUFFER_SIZE].message);
+				return -1;
+			}
+
+			// Remove action from the FIFO buffer
+			pss->nwa_front++;
+			pss->nwa_cur--;
 		
 		default:
 			break;
@@ -951,7 +1044,16 @@ callback_yi_hack_v3_test_proxy(struct lws *wsi, enum lws_callback_reasons reason
 			break;
 
 		case LWS_CALLBACK_USER:
-			test_proxy(pss);
+			switch (pss->type)
+			{
+				case TEST_CONFIG:
+					test_config(pss);
+					break;
+				case TEST_LIST:
+					break;
+				case DOWNLOAD_LIST:
+					break;
+			}
 			determine_next_action(vhd, pss);
 
 			break;

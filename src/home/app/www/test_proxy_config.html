@@ -48,8 +48,13 @@
 
 		<!-- Main component for a primary marketing message or call to action -->
 		<div class="page-header">
-			<h1>ProxyChains-ng Test</h1>
+			<h1>ProxyChains-ng Test Config</h1>
 		</div>
+
+		<div class="progress">
+			<div class="progress-bar" role="progressbar" style="width: 0%;"></div>
+		</div>
+
 		<div id="error"></div>
 		<div id="warning"></div>
 		<div id="information"></div>
@@ -114,7 +119,7 @@
 		<pre class="pre-scrollable small" id="PROXYCHAINSNG_log" name="log"></pre>
 		<p>Service Provided by <a href="http://ipinfo.io">ipinfo.io</a>.</p>
 		<a class="btn btn-primary" href="proxy_config.html" role="button">Back</a>
-		<a class="btn btn-primary" href="test_proxy.html" role="button">Retry</a>
+		<a class="btn btn-primary" href="test_proxy_config.html" role="button">Retry</a>
 	</div>
 
 	<!-- Bootstrap core JavaScript
@@ -299,6 +304,8 @@ function init() {
 						info_num++;
 						break;
 				}
+			} else if (jso.message == "SEND_PROGRESS") {
+				document.getElementsByClassName("progress-bar")[0].setAttribute("style","width:" + jso.percentage + "%");
 			}
 		} 
 
@@ -311,7 +318,7 @@ function init() {
 
 function init_test_proxy() {
 	document.getElementById("PROXYCHAINSNG_log").value = "";
-	socket_test_proxy.send("TEST_PROXY\n");
+	socket_test_proxy.send("TEST_CONFIG\n");
 }
 
 function remove_information(x) {
