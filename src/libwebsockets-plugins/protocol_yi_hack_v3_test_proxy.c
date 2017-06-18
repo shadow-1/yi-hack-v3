@@ -11,10 +11,14 @@
 #include <errno.h>
 #include <sys/wait.h>
 #include <math.h>
+#include <stdbool.h>
 
 /**
  * Constants used in the plugin.
  */
+#define PROXYCHAINSNG_CONFIG_FILE "/home/app/proxychains.conf"
+#define TEMP_PROXYCHAINSNG_CONFIG_FILE "/tmp/temp_proxychains.conf"
+#define TEMP_DOWNLOAD_FILE "/tmp/temp_proxy_list.txt"
 #define NOTIFICATION_MAX_LENGTH 200
 #define BUFFER_SIZE 10
 #define CHUNK_SIZE 200
@@ -50,6 +54,45 @@ char* args_get_proxy_info[] =
 	"https://ipinfo.io",
 	NULL
 };
+
+/**
+ * Command to run to test temporary ProxyChains-ng configuration.
+ */
+char* args_get_proxy_info_temp[] =
+{
+	"proxychains4",
+	"-f",
+	TEMP_PROXYCHAINSNG_CONFIG_FILE,
+	"wget",
+	"-O-",
+	"-q",
+	"-T",
+	"8",
+	"https://ipinfo.io/geo",
+	NULL
+};
+
+/**
+ * Command to run to download proxy file.
+ */
+char* args_download_list[] =
+{
+	"wget",
+	"-O",
+	TEMP_DOWNLOAD_FILE,
+	"https://freevpn.ninja/free-proxy/txt",
+	NULL
+};
+
+/**
+ * Base ProxyChains-ng config for temporary config file.
+ */
+char base_config[] =
+	"random_chain\n"
+	"chain_len = 1\n"
+	"tcp_read_time_out 15000\n"
+	"tcp_connect_time_out 8000\n"
+	"[ProxyList]\n";
 
 /**
  * Array of JSON keys to decode.
@@ -91,7 +134,8 @@ enum lws_write_action
 	SEND_PROXY_INFO,
 	SEND_LOG,
 	SEND_NOTIFICATION,
-	SEND_PROGRESS
+	SEND_PROGRESS,
+	SEND_LIST
 };
 
 /**
@@ -132,6 +176,9 @@ enum test_proxy_state
 {
 	IDLE,
 	INIT,
+	DOWNLOAD_FILE,
+	PARSE_FILE,
+	PREP_TEMP_CONFIG_FILE,
 	GET_INFO,
 	GET_PROXY_INFO,
 	CLOSE
@@ -160,11 +207,22 @@ struct log
 };
 
 /**
+ * Linked List of proxy servers in ProxyChains-ng format.
+ */
+struct proxy
+{
+	unsigned int num;
+	char *line;
+	struct proxy *next;
+};
+
+/**
  * Data structure that contains all variables that are needed when sending
  * information about the test program through WebSocket connection.
  */
 struct test_info
 {
+	unsigned int index;
 	short return_value;
 	short iteration;
 	unsigned char ip[16];
@@ -185,6 +243,7 @@ struct per_vhost_data__yi_hack_v3_test_proxy
 	struct lws_context *context;
 	struct lws_vhost *vhost;
 	const struct lws_protocols *protocol;
+	struct lws_plat_file_ops *fops_plat;
 };
 
 /**
@@ -202,19 +261,21 @@ struct per_session_data__yi_hack_v3_test_proxy
 	enum test_type type;
 	enum test_proxy_state state;
 	struct test_info test_information;
+	bool stopping;
+	short iteration;
 
 	int outfd[2];
     int infd[2];
 	int errfd[2];
-
 	pid_t pid;
 
 	struct lejp_ctx ctx;
 
-	short iteration;
+	unsigned int progress;
+	unsigned int progress_num;
 
-	unsigned char progress;
-	unsigned char progress_num;
+	struct proxy *head;
+	struct proxy *current;
 };
 
 struct per_vhost_data__yi_hack_v3_test_proxy *vhd;
@@ -283,6 +344,11 @@ void session_init(struct per_session_data__yi_hack_v3_test_proxy *pss)
 	pss->errfd[0] = 0;
 	pss->errfd[1] = 0;
 	pss->pid = 0;
+
+	pss->head = NULL;
+	pss->current = NULL;
+
+	pss->stopping = false;
 }
 
 /**
@@ -307,7 +373,7 @@ void determine_next_action(struct per_vhost_data__yi_hack_v3_test_proxy *vhd
 }
 
 /**
- * Fork a process which executes the test command
+ * Fork a process which executes the test command.
  * @param infd: Stdin pipe.
  * @param outfd: Stdout pipe.
  * @param errfd: Stderr pipe.
@@ -466,7 +532,1047 @@ pid_t execute_process(int infd[], int outfd[], int errfd[], pid_t *pid, char *ar
 }
 
 /**
- * Determine steps that need to be performed to test proxy configuration
+ * Cleanup variables and dynamically allocated memory assuming that the cleanup is
+ * being called asynchronously.
+ * @param pss: Structure that holds variables that persist per Websocket session.
+ */
+void cleanup(struct per_session_data__yi_hack_v3_test_proxy *pss)
+{
+	// Cleanup dynamically allocated proxy list
+	while (pss->head != NULL)
+	{
+		pss->current = pss->head;
+		pss->head = pss->head->next;
+
+		if (pss->current->line != NULL)
+		{
+			free (pss->current->line);
+			pss->current->line = NULL;
+		}
+		free(pss->current);
+	}
+
+	pss->head = NULL;
+	pss->current = NULL;
+
+	// If a child process is still running, terminate it and cleanup
+	if (pss->pid != 0)
+	{
+		kill(pss->pid, SIGKILL);
+		pss->outfd[0] = 0;
+		pss->outfd[1] = 0;
+		pss->infd[0] = 0;
+		pss->infd[1] = 0;
+		pss->errfd[0] = 0;
+		pss->errfd[1] = 0;
+		pss->pid = 0;
+	}
+}
+
+/**
+ * Execute steps that need to be performed to download and test each proxy server
+ * that is flagged as being based in Mainland China from the free proxy server
+ * list made available on freevpn.ninja based on the current state.
+ * @param pss: Structure that holds variables that persist per Websocket session.
+ */
+void download_list(struct per_vhost_data__yi_hack_v3_test_proxy *vhd
+		, struct per_session_data__yi_hack_v3_test_proxy *pss, char *buf)
+{
+	pid_t rv;
+	int status;
+	bool partial_read;
+	int i;
+
+	lws_fop_fd_t fop_fd;
+	lws_filepos_t fop_len;
+	lws_fop_flags_t flags;
+	int file_ret;
+	char *token;
+	char *ret;
+
+	struct proxy *link;
+
+	char temp_string[100];
+	char ip[16];
+	char port[6];
+	char proxy[7];
+	char country[3];
+
+	switch (pss->state)
+	{
+		case INIT:
+			pss->iteration = 1;
+			pss->progress = 1;
+			
+			if (pss->stopping)
+			{
+				pss->state = CLOSE;
+			}
+			else
+			{
+				pss->state = DOWNLOAD_FILE;
+			}
+
+			break;
+			
+		case DOWNLOAD_FILE:
+			if (pss->stopping)
+			{
+				if (pss->pid != 0)
+				{
+					kill(pss->pid, SIGKILL);
+				}
+			}
+
+			lejp_construct(&pss->ctx, test_proxy_cb, pss, proxy_json,
+					ARRAY_SIZE(proxy_json));
+			rv = execute_process(pss->infd, pss->outfd, pss->errfd, &pss->pid
+					, args_download_list, &status, pss);
+
+			if (rv < 0)
+			{
+				pss->nwa_back++;
+				pss->next_notification[pss->nwa_back%BUFFER_SIZE].nt = ERROR;
+				pss->next_notification[pss->nwa_back%BUFFER_SIZE].code = errno;
+				sprintf(pss->next_notification[pss->nwa_back%BUFFER_SIZE].message,
+						"ERROR (%d): Could not start external process.\n", errno);
+				pss->next_write_action[pss->nwa_back%BUFFER_SIZE] = SEND_NOTIFICATION;
+				pss->nwa_cur++;
+				lwsl_err(pss->next_notification[pss->nwa_back%BUFFER_SIZE].message);
+				pss->state = CLOSE;
+				return;
+			}
+			else if (rv == 0)
+			{
+				// Process has not finished (callback needs to be called again)
+				break;
+			}
+			else
+			{
+				// Process finished, cleanup and move onto next step
+				pss->outfd[0] = 0;
+				pss->outfd[1] = 0;
+				pss->infd[0] = 0;
+				pss->infd[1] = 0;
+				pss->errfd[0] = 0;
+				pss->errfd[1] = 0;
+				pss->pid = 0;
+
+				// If process completed successfully, move onto the next step
+				if (status == 0)
+				{
+					pss->state = PARSE_FILE;
+				}
+				else
+				{
+					if (!pss->stopping)
+					{
+						pss->nwa_back++;
+						pss->next_notification[pss->nwa_back%BUFFER_SIZE].nt = ERROR;
+						sprintf(pss->next_notification[pss->nwa_back%BUFFER_SIZE].message,
+								"Could not connect to freevpn.ninja, "
+								"ensure that you are connectected to the Internet.\n");
+						pss->next_write_action[pss->nwa_back%BUFFER_SIZE] =
+								SEND_NOTIFICATION;
+						pss->nwa_cur++;
+						lwsl_err(pss->next_notification[pss->nwa_back%BUFFER_SIZE]
+								.message);
+					}
+					pss->state = CLOSE;
+				}
+			}
+
+			break;
+		
+		case PARSE_FILE:
+			partial_read = false;
+			i = 0;
+			
+			// Open downloaded file and read proxy server lines
+			flags = LWS_O_RDONLY;
+			fop_fd = lws_vfs_file_open(vhd->fops_plat, TEMP_DOWNLOAD_FILE, &flags);
+
+			if (!fop_fd)
+			{
+				lwsl_err("ERROR (%d): Failed to open file - %s.\n", errno,
+						TEMP_DOWNLOAD_FILE);
+				pss->state = CLOSE;
+				return;
+			}
+
+			// Read contents of the downloaded file
+			file_ret = lws_vfs_file_read(fop_fd, &fop_len, buf, 100);
+
+			if (file_ret < 0)
+			{
+				lwsl_err("ERROR (%d): Failed to read file - %s.\n", errno,
+						TEMP_DOWNLOAD_FILE);
+				pss->state = CLOSE;
+				return;
+			}
+
+			while (fop_len > 0)
+			{
+				buf[fop_len] = '\0';
+				token = buf;
+
+				ret = strchr(buf, '\n');
+
+				// If a last line was partially read from the last chunk
+				if (partial_read)
+				{
+					if (ret != NULL)
+					{
+						// Join the last partial line read from the last chunk to the
+						// end of the first line in the new chunk
+						*ret = '\0';
+						strcat(temp_string, token);
+
+						// Read IP Address if available
+						token = strtok(temp_string, ": ");
+						if (token == NULL)
+						{
+							strcpy(ip, "");
+						}
+						else
+						{
+							strcpy(ip, token);
+						}
+
+						// Read Port if available
+						token = strtok(NULL, ": ");
+						if (token == NULL)
+						{
+							strcpy(port, "");
+						}
+						else
+						{
+							strcpy(port, token);
+						}
+
+						// Read Proxy type if available
+						token = strtok(NULL, ": ");
+						if (token == NULL)
+						{
+							strcpy(proxy, "");
+						}
+						else
+						{
+							strcpy(proxy, token);
+						}
+
+						// Read Country if available
+						token = strtok(NULL, ": ");
+						if (token == NULL)
+						{
+							strcpy(country, "");
+						}
+						else
+						{
+							strcpy(country, token);
+						}
+
+						// If a proxy server from Mainland China was read and the 
+						// proxy server is not HTTP (supports SSL connections)
+						if (strcmp(country, "cn") == 0 && strcmp(proxy, "http") != 0)
+						{
+							// Update HTTPS proxy type to HTTP which is required
+							// in ProxyChains-ng configuration file syntax
+							if (strcmp(proxy, "https") == 0)
+							{
+								strcpy(proxy, "http");
+							}
+
+							// Setup proxy server line in ProxyChains-ng
+							// compatible syntax
+							sprintf(temp_string, "%s %s %s", proxy, ip, port);
+
+							// Dynamically allocate new node for Linked List
+							i++;
+							link = (struct proxy*)malloc(sizeof(struct proxy));
+							link->line = (char*)malloc(strlen(temp_string) + 1);
+							strcpy(link->line, temp_string);
+							link->num = i;
+							link->next = NULL;
+
+							// If there is no head node, this node will become the head
+							if (pss->head == NULL)
+							{
+								pss->head = link;
+								pss->current = link;
+							}
+							// Otherwise join the end of the Linked List
+							else
+							{
+								pss->current->next = link;
+								pss->current = link;
+							}
+						}
+						token = ret + 1;
+						ret = strchr(token, '\n');
+					}
+					partial_read = false;
+				}
+
+				// Foe each line in the chunk currently being read
+				while (ret != NULL)
+				{
+					// Copy the next line from the downloaded file
+					*ret = '\0';
+					strcpy(temp_string, token);
+
+					// Read IP Address if available
+					token = strtok(temp_string, ": ");
+					if (token == NULL)
+					{
+						strcpy(ip, "");
+					}
+					else
+					{
+						strcpy(ip, token);
+					}
+
+					// Read Port if available
+					token = strtok(NULL, ": ");
+					if (token == NULL)
+					{
+						strcpy(port, "");
+					}
+					else
+					{
+						strcpy(port, token);
+					}
+
+					// Read Proxy type if available
+					token = strtok(NULL, ": ");
+					if (token == NULL)
+					{
+						strcpy(proxy, "");
+					}
+					else
+					{
+						strcpy(proxy, token);
+					}
+
+					// Read Country if available
+					token = strtok(NULL, ": ");
+					if (token == NULL)
+					{
+						strcpy(country, "");
+					}
+					else
+					{
+						strcpy(country, token);
+					}
+
+					// If a proxy server from Mainland China was read and the 
+					// proxy server is not HTTP (supports SSL connections)
+					if (strcmp(country, "cn") == 0 && strcmp(proxy, "http") != 0)
+					{
+						// Update HTTPS proxy type to HTTP which is required
+						// in ProxyChains-ng configuration file syntax
+						if (strcmp(proxy, "https") == 0)
+						{
+							strcpy(proxy, "http");
+						}
+
+						// Setup proxy server line in ProxyChains-ng compatible syntax
+						sprintf(temp_string, "%s %s %s", proxy, ip, port);
+
+						// Dynamically allocate new node for Linked List
+						i++;
+						link = (struct proxy*)malloc(sizeof(struct proxy));
+						link->line = (char*)malloc(strlen(temp_string) + 1);
+						strcpy(link->line, temp_string);
+						link->num = i;
+						link->next = NULL;
+
+						// If there is no head node, this node will become the head
+						if (pss->head == NULL)
+						{
+							pss->head = link;
+							pss->current = link;
+						}
+						// Otherwise join the end of the Linked List
+						else
+						{
+							pss->current->next = link;
+							pss->current = link;
+						}
+					}
+
+					// Get next line in the proxy config
+					token = ret + 1;
+					ret = strchr(token, '\n');
+				}
+
+				// Store the last partial line for processing when the next chunk is read
+				strcpy(temp_string, token);
+				partial_read = true;
+
+				// Read contents of the downloaded file
+				file_ret = lws_vfs_file_read(fop_fd, &fop_len, buf, 100);
+			}
+
+			// Close the config file
+			lws_vfs_file_close(&fop_fd);
+
+			// If we are stopping, go to CLOSE state
+			if (pss->stopping)
+			{
+				pss->state = CLOSE;
+			}
+			// Otherwise send progress, proxy list through WebSocket connection
+			// and move onto the next step
+			else
+			{
+				pss->progress_num = (3 * pss->current->num) + 2;
+
+				pss->nwa_back++;
+				pss->next_write_action[pss->nwa_back%BUFFER_SIZE] = SEND_PROGRESS;
+				pss->nwa_cur++;
+
+				pss->current = pss->head;
+
+				pss->nwa_back++;
+				pss->next_write_action[pss->nwa_back%BUFFER_SIZE] = SEND_LIST;
+				pss->nwa_cur++;
+
+				pss->state = PREP_TEMP_CONFIG_FILE;
+			}
+
+			break;
+
+		case PREP_TEMP_CONFIG_FILE:
+			// If there is nothing to do, move to the next state
+			if (pss->current == NULL)
+			{
+				pss->state = CLOSE;
+				break;
+			}
+
+			// Open the ProxyChains-ng temp config file for writing,
+			// replacing the file if it exists
+			flags = O_WRONLY | O_CREAT | O_TRUNC;
+			fop_fd = lws_vfs_file_open(vhd->fops_plat, TEMP_PROXYCHAINSNG_CONFIG_FILE
+					, &flags);
+
+			if (!fop_fd)
+			{
+				pss->nwa_back++;
+				pss->next_notification[pss->nwa_back%BUFFER_SIZE].nt = ERROR;
+				pss->next_notification[pss->nwa_back%BUFFER_SIZE].code = errno;
+				sprintf(pss->next_notification[pss->nwa_back%BUFFER_SIZE].message,
+						"ERROR (%d): Failed to open file - %s.\n", errno
+						, TEMP_PROXYCHAINSNG_CONFIG_FILE);
+				pss->next_write_action[pss->nwa_back%BUFFER_SIZE] =
+						SEND_NOTIFICATION;
+				pss->nwa_cur++;
+				lwsl_err(pss->next_notification[pss->nwa_back%BUFFER_SIZE].message);
+				pss->state = CLOSE;
+				return;
+			}
+
+			// Write config file
+			strcpy(buf, base_config);
+			strcat(buf, pss->current->line);
+			i = strlen(buf);
+			file_ret = lws_vfs_file_write(fop_fd, &fop_len, buf
+					, i);
+
+			if (file_ret < 0)
+			{
+				pss->nwa_back++;
+				pss->next_notification[pss->nwa_back%BUFFER_SIZE].nt = ERROR;
+				pss->next_notification[pss->nwa_back%BUFFER_SIZE].code = errno;
+				sprintf(pss->next_notification[pss->nwa_back%BUFFER_SIZE].message,
+						"ERROR (%d): Failed to write file - %s.\n", errno
+						, TEMP_PROXYCHAINSNG_CONFIG_FILE);
+				pss->next_write_action[pss->nwa_back%BUFFER_SIZE] = SEND_NOTIFICATION;
+				pss->nwa_cur++;
+				lwsl_err(pss->next_notification[pss->nwa_back%BUFFER_SIZE].message);
+				pss->state = CLOSE;
+				return;
+			}
+
+			// Close the temp config file
+			lws_vfs_file_close(&fop_fd);
+
+			// If we are stopping, go to CLOSE state
+			if (pss->stopping)
+			{
+				pss->state = CLOSE;
+			}
+			// Otherwise move onto the next step
+			else
+			{
+				pss->state = GET_PROXY_INFO;
+			}
+
+			break;
+
+		case GET_PROXY_INFO:
+			// If we are stopping, kill the current child process
+			// if one has been executed
+			if (pss->stopping)
+			{
+				if (pss->pid != 0)
+				{
+					kill(pss->pid, SIGKILL);
+				}
+			}
+
+			// Execute child process
+			lejp_construct(&pss->ctx, test_proxy_cb, pss, proxy_json
+					, ARRAY_SIZE(proxy_json));
+			rv = execute_process(pss->infd, pss->outfd, pss->errfd, &pss->pid
+					, args_get_proxy_info_temp, &status, pss);
+
+			if (rv < 0)
+			{
+				pss->nwa_back++;
+				pss->next_notification[pss->nwa_back%BUFFER_SIZE].nt = ERROR;
+				pss->next_notification[pss->nwa_back%BUFFER_SIZE].code = errno;
+				sprintf(pss->next_notification[pss->nwa_back%BUFFER_SIZE].message,
+						"ERROR (%d): Could not start external process.\n", errno);
+				pss->next_write_action[pss->nwa_back%BUFFER_SIZE] = SEND_NOTIFICATION;
+				pss->nwa_cur++;
+				lwsl_err(pss->next_notification[pss->nwa_back%BUFFER_SIZE].message);
+				pss->state = CLOSE;
+				return;
+			}
+			else if (rv == 0)
+			{
+				// Process has not finished (callback needs to be called again)
+			}
+			else
+			{
+				// Process finished, cleanup and move onto next step
+				lejp_destruct(&pss->ctx);
+				pss->outfd[0] = 0;
+				pss->outfd[1] = 0;
+				pss->infd[0] = 0;
+				pss->infd[1] = 0;
+				pss->errfd[0] = 0;
+				pss->errfd[1] = 0;
+				pss->pid = 0;
+
+				// Send current progress
+				pss->progress = (3 * (pss->current->num - 1)) + pss->iteration + 1;
+				pss->nwa_back++;
+				pss->next_write_action[pss->nwa_back%BUFFER_SIZE] = SEND_PROGRESS;
+				pss->nwa_cur++;
+
+				// Get return value, interation and send through WebSocket connection
+				pss->test_information.index = pss->current->num;
+				pss->test_information.return_value = WEXITSTATUS(status);
+				pss->test_information.iteration = pss->iteration;
+
+				pss->nwa_back++;
+				pss->next_write_action[pss->nwa_back%BUFFER_SIZE] = SEND_PROXY_INFO;
+				pss->nwa_cur++;
+
+				// If process completed successfully, move onto the next proxy server
+				if (status == 0)
+				{
+					// Send current progress
+					pss->progress = (3 * pss->current->num) + 1;
+					pss->nwa_back++;
+					pss->next_write_action[pss->nwa_back%BUFFER_SIZE] = SEND_PROGRESS;
+					pss->nwa_cur++;
+					
+					// If the detected country is not Mainland China,
+					// fail the test and send a warning through the WebSocket connection
+					if (strcmp(pss->test_information.country, "CN"))
+					{
+						pss->test_information.return_value = 1;
+
+						pss->nwa_back++;
+						pss->next_notification[pss->nwa_back%BUFFER_SIZE].nt = WARNING;
+						sprintf(pss->next_notification[pss->nwa_back%BUFFER_SIZE].message,
+								"ProxyChains-ng configuration appears to contain at least "
+								"one proxy server that is located outside Mainland China. "
+								"Ensure all configured proxy servers are located within "
+								"Mainland China.");
+						pss->next_write_action[pss->nwa_back%BUFFER_SIZE] =
+								SEND_NOTIFICATION;
+						pss->nwa_cur++;
+					}
+
+					pss->iteration = 1;
+					pss->current = pss->current->next;
+					pss->state = PREP_TEMP_CONFIG_FILE;
+				}
+				// Otherwise send error message and abort
+				else
+				{
+					// If we are stopping, go to CLOSE state
+					if (pss->stopping)
+					{
+						pss->state = CLOSE;
+					}
+					else
+					{
+						// If the process failed, retry
+						if (pss->iteration < NUM_RETRY)
+						{
+							pss->iteration++;
+						}
+						// Otherwise move onto next proxy server
+						else
+						{
+							pss->iteration = 1;
+							pss->current = pss->current->next;
+							pss->state = PREP_TEMP_CONFIG_FILE;
+						}
+					}
+				}
+			}
+
+			break;
+
+		case CLOSE:
+			// Finished the test
+			pss->progress = pss->progress_num;
+			pss->nwa_back++;
+			pss->next_write_action[pss->nwa_back%BUFFER_SIZE] = SEND_PROGRESS;
+			pss->nwa_cur++;
+
+			pss->nwa_back++;
+			pss->next_notification[pss->nwa_back%BUFFER_SIZE].nt = INFORMATION;
+			if (pss->stopping)
+			{
+				sprintf(pss->next_notification[pss->nwa_back%BUFFER_SIZE].message,
+					"ProxyChains-ng test stopped successfully.");
+			}
+			else
+			{
+				sprintf(pss->next_notification[pss->nwa_back%BUFFER_SIZE].message,
+					"ProxyChains-ng test completed.");
+			}
+			pss->next_write_action[pss->nwa_back%BUFFER_SIZE] = SEND_NOTIFICATION;
+			pss->nwa_cur++;
+
+			cleanup(pss);
+
+			pss->state = IDLE;
+
+			break;
+
+		default:
+			break;
+	}
+}
+
+/**
+ * Execute steps that need to be performed to test each proxy server configured
+ * within the ProxyChains-ng configuration file based on the current state.
+ * @param pss: Structure that holds variables that persist per Websocket session.
+ */
+void test_list(struct per_vhost_data__yi_hack_v3_test_proxy *vhd
+		, struct per_session_data__yi_hack_v3_test_proxy *pss, char *buf)
+{
+	pid_t rv;
+	int status;
+	bool reached_proxy_list;
+	bool partial_read;
+	int i;
+
+	lws_fop_fd_t fop_fd;
+	lws_filepos_t fop_len;
+	lws_fop_flags_t flags;
+	int file_ret;
+	char *token;
+	char *ret;
+
+	struct proxy *link;
+
+	switch (pss->state)
+	{
+		case INIT:
+			pss->iteration = 1;
+			pss->progress = 1;
+
+			if (pss->stopping)
+			{
+				pss->state = CLOSE;
+			}
+			else
+			{
+				pss->state = PARSE_FILE;
+			}
+
+			break;
+
+		case PARSE_FILE:
+			partial_read = false;
+			reached_proxy_list = false;
+
+			// Open ProxyChains-ng config file and read proxy server lines
+			flags = LWS_O_RDONLY;
+			fop_fd = lws_vfs_file_open(vhd->fops_plat, PROXYCHAINSNG_CONFIG_FILE,
+					&flags);
+
+			if (!fop_fd)
+			{
+				lwsl_err("ERROR (%d): Failed to open file - %s.\n", errno,
+						PROXYCHAINSNG_CONFIG_FILE);
+				pss->state = CLOSE;
+				return;
+			}
+
+			// Read contents of the config file
+			file_ret = lws_vfs_file_read(fop_fd, &fop_len, buf, 100);
+
+			if (file_ret < 0)
+			{
+				lwsl_err("ERROR (%d): Failed to read file - %s.\n", errno,
+						PROXYCHAINSNG_CONFIG_FILE);
+				pss->state = CLOSE;
+				return;
+			}
+
+			while (fop_len > 0)
+			{
+				buf[fop_len] = '\0';
+				token = buf;
+
+				ret = strchr(buf, '\n');
+
+				// If a last line was partially read from the last chunk
+				if (partial_read)
+				{
+					if (ret != NULL)
+					{
+						// Join the last partial line read from the last chunk to the
+						// end of the first line in the new chunk
+						*ret = '\0';
+						pss->current->line = (char*)realloc(pss->current->line,
+								strlen(pss->current->line) + strlen(token) + 1);
+						strcat(pss->current->line, token);
+						token = ret + 1;
+						ret = strchr(token, '\n');
+					}
+					partial_read = false;
+				}
+
+				// For each line in the chunk currently being read
+				while (ret != NULL)
+				{
+					*ret = '\0';
+
+					// If we have not reached [ProxyList], move onto next line
+					if (!reached_proxy_list)
+					{
+						if (strcmp(token, "[ProxyList]") == 0)
+						{
+							reached_proxy_list = true;
+							i = 0;
+						}
+					}
+					else
+					{
+						// Dynamically allocate new node for Linked List
+						i++;
+						link = (struct proxy*)malloc(sizeof(struct proxy));
+						link->line = (char*)malloc(strlen(token) + 1);
+						strcpy(link->line, token);
+						link->num = i;
+						link->next = NULL;
+
+						// If there is no head node, this node will become the head
+						if (pss->head == NULL)
+						{
+							pss->head = link;
+							pss->current = link;
+						}
+						// Otherwise join the end of the Linked List
+						else
+						{
+							pss->current->next = link;
+							pss->current = link;
+						}
+					}
+
+					// Get next line in the proxy config
+					token = ret + 1;
+					ret = strchr(token, '\n');
+				}
+
+				// Dynamically allocate memory for a new node
+				i++;
+				link = (struct proxy*)malloc(sizeof(struct proxy));
+				link->line = (char*)malloc(strlen(token) + 1);
+				strcpy(link->line, token);
+				link->num = i;
+				link->next = NULL;
+
+				// If there is no head node, this node will become the head
+				if (pss->head == NULL)
+				{
+					pss->head = link;
+					pss->current = link;
+				}
+				// Otherwise join the end of the Linked List
+				else
+				{
+					pss->current->next = link;
+					pss->current = link;
+				}
+
+				// Store the last partial line for processing when the next chunk is read
+				partial_read = true;
+
+				// Read contents of the config file
+				file_ret = lws_vfs_file_read(fop_fd, &fop_len, buf, 100);
+			}
+
+			// Close the config file
+			lws_vfs_file_close(&fop_fd);
+
+			// If we are stopping, go to CLOSE state
+			if (pss->stopping)
+			{
+				pss->state = CLOSE;
+			}
+			// Otherwise send progress, proxy list through WebSocket connection
+			// and move onto the next step
+			else
+			{
+				pss->progress_num = (3 * pss->current->num) + 2;
+
+				pss->nwa_back++;
+				pss->next_write_action[pss->nwa_back%BUFFER_SIZE] = SEND_PROGRESS;
+				pss->nwa_cur++;
+
+				pss->current = pss->head;
+
+				pss->nwa_back++;
+				pss->next_write_action[pss->nwa_back%BUFFER_SIZE] = SEND_LIST;
+				pss->nwa_cur++;
+
+				pss->state = PREP_TEMP_CONFIG_FILE;
+			}
+
+			break;
+		
+		case PREP_TEMP_CONFIG_FILE:
+			// If there is nothing to do, move to the next state
+			if (pss->current == NULL)
+			{
+				pss->state = CLOSE;
+				break;
+			}
+
+			// Open the ProxyChains-ng temp config file for writing,
+			// replacing the file if it exists
+			flags = O_WRONLY | O_CREAT | O_TRUNC;
+			fop_fd = lws_vfs_file_open(vhd->fops_plat, TEMP_PROXYCHAINSNG_CONFIG_FILE
+					, &flags);
+
+			if (!fop_fd)
+			{
+				pss->nwa_back++;
+				pss->next_notification[pss->nwa_back%BUFFER_SIZE].nt = ERROR;
+				pss->next_notification[pss->nwa_back%BUFFER_SIZE].code = errno;
+				sprintf(pss->next_notification[pss->nwa_back%BUFFER_SIZE].message,
+						"ERROR (%d): Failed to open file - %s.\n", errno
+						, TEMP_PROXYCHAINSNG_CONFIG_FILE);
+				pss->next_write_action[pss->nwa_back%BUFFER_SIZE] =
+						SEND_NOTIFICATION;
+				pss->nwa_cur++;
+				lwsl_err(pss->next_notification[pss->nwa_back%BUFFER_SIZE].message);
+				pss->state = CLOSE;
+				return;
+			}
+
+			// Write config file
+			strcpy(buf, base_config);
+			strcat(buf, pss->current->line);
+			i = strlen(buf);
+			file_ret = lws_vfs_file_write(fop_fd, &fop_len, buf
+					, i);
+
+			if (file_ret < 0)
+			{
+				pss->nwa_back++;
+				pss->next_notification[pss->nwa_back%BUFFER_SIZE].nt = ERROR;
+				pss->next_notification[pss->nwa_back%BUFFER_SIZE].code = errno;
+				sprintf(pss->next_notification[pss->nwa_back%BUFFER_SIZE].message,
+						"ERROR (%d): Failed to write file - %s.\n", errno
+						, TEMP_PROXYCHAINSNG_CONFIG_FILE);
+				pss->next_write_action[pss->nwa_back%BUFFER_SIZE] =
+						SEND_NOTIFICATION;
+				pss->nwa_cur++;
+				lwsl_err(pss->next_notification[pss->nwa_back%BUFFER_SIZE].message);
+				pss->state = CLOSE;
+				return;
+			}
+
+			// Close the temp config file
+			lws_vfs_file_close(&fop_fd);
+
+			// If we are stopping, go to CLOSE state
+			if (pss->stopping)
+			{
+				pss->state = CLOSE;
+			}
+			// Otherwise move onto the next step
+			else
+			{
+				pss->state = GET_PROXY_INFO;
+			}
+
+			break;
+
+		case GET_PROXY_INFO:
+			// If we are stopping, kill the current child process
+			// if one has been executed
+			if (pss->stopping)
+			{
+				if (pss->pid != 0)
+				{
+					kill(pss->pid, SIGKILL);
+				}
+			}
+
+			// Execute child process
+			lejp_construct(&pss->ctx, test_proxy_cb, pss, proxy_json
+					, ARRAY_SIZE(proxy_json));
+			rv = execute_process(pss->infd, pss->outfd, pss->errfd, &pss->pid
+					, args_get_proxy_info_temp, &status, pss);
+
+			if (rv < 0)
+			{
+				pss->nwa_back++;
+				pss->next_notification[pss->nwa_back%BUFFER_SIZE].nt = ERROR;
+				pss->next_notification[pss->nwa_back%BUFFER_SIZE].code = errno;
+				sprintf(pss->next_notification[pss->nwa_back%BUFFER_SIZE].message,
+						"ERROR (%d): Could not start external process.\n"
+						, errno);
+				pss->next_write_action[pss->nwa_back%BUFFER_SIZE] = SEND_NOTIFICATION;
+				pss->nwa_cur++;
+				lwsl_err(pss->next_notification[pss->nwa_back%BUFFER_SIZE].message);
+				pss->state = CLOSE;
+				return;
+			}
+			else if (rv == 0)
+			{
+				// Process has not finished (callback needs to be called again)
+			}
+			else
+			{
+				// Process finished, cleanup and move onto next step
+				lejp_destruct(&pss->ctx);
+				pss->outfd[0] = 0;
+				pss->outfd[1] = 0;
+				pss->infd[0] = 0;
+				pss->infd[1] = 0;
+				pss->errfd[0] = 0;
+				pss->errfd[1] = 0;
+				pss->pid = 0;
+
+				// Send current progress
+				pss->progress = (3 * (pss->current->num - 1)) + pss->iteration + 1;
+				pss->nwa_back++;
+				pss->next_write_action[pss->nwa_back%BUFFER_SIZE] = SEND_PROGRESS;
+				pss->nwa_cur++;
+
+				// Get return value, interation and send through WebSocket connection
+				pss->test_information.index = pss->current->num;
+				pss->test_information.return_value = WEXITSTATUS(status);
+				pss->test_information.iteration = pss->iteration;
+
+				pss->nwa_back++;
+				pss->next_write_action[pss->nwa_back%BUFFER_SIZE] = SEND_PROXY_INFO;
+				pss->nwa_cur++;
+
+				// If process completed successfully, move onto the next proxy server
+				if (status == 0)
+				{
+					// Send current progress
+					pss->progress = (3 * pss->current->num) + 1;
+					pss->nwa_back++;
+					pss->next_write_action[pss->nwa_back%BUFFER_SIZE] = SEND_PROGRESS;
+					pss->nwa_cur++;
+					
+					// If the detected country is not Mainland China,
+					// fail the test and send a warning through the WebSocket connection
+					if (strcmp(pss->test_information.country, "CN"))
+					{
+						pss->test_information.return_value = 1;
+
+						pss->nwa_back++;
+						pss->next_notification[pss->nwa_back%BUFFER_SIZE].nt = WARNING;
+						sprintf(pss->next_notification[pss->nwa_back%BUFFER_SIZE].message,
+								"ProxyChains-ng configuration appears to contain at least "
+								"one proxy server that is located outside Mainland China. "
+								"Ensure all configured proxy servers are located within "
+								"Mainland China.");
+						pss->next_write_action[pss->nwa_back%BUFFER_SIZE] =
+								SEND_NOTIFICATION;
+						pss->nwa_cur++;
+					}
+
+					pss->iteration = 1;
+					pss->current = pss->current->next;
+					pss->state = PREP_TEMP_CONFIG_FILE;
+				}
+				// Otherwise send error message and abort
+				else
+				{
+					// If we are stopping, go to CLOSE state
+					if (pss->stopping)
+					{
+						pss->state = CLOSE;
+					}
+					else
+					{
+						// If the process failed, retry
+						if (pss->iteration < NUM_RETRY)
+						{
+							pss->iteration++;
+						}
+						// Otherwise move onto next proxy server
+						else
+						{
+							pss->iteration = 1;
+							pss->current = pss->current->next;
+							pss->state = PREP_TEMP_CONFIG_FILE;
+						}
+					}
+				}
+			}
+
+			break;
+
+		case CLOSE:
+			// Finished the test
+			pss->progress = pss->progress_num;
+			pss->nwa_back++;
+			pss->next_write_action[pss->nwa_back%BUFFER_SIZE] = SEND_PROGRESS;
+			pss->nwa_cur++;
+
+			pss->nwa_back++;
+			pss->next_notification[pss->nwa_back%BUFFER_SIZE].nt = INFORMATION;
+			sprintf(pss->next_notification[pss->nwa_back%BUFFER_SIZE].message,
+					"ProxyChains-ng test completed.");
+			pss->next_write_action[pss->nwa_back%BUFFER_SIZE] = SEND_NOTIFICATION;
+			pss->nwa_cur++;
+
+			cleanup(pss);
+
+			pss->state = IDLE;
+
+			break;
+
+		default:
+			break;
+	}
+}
+
+/**
+ * Execute steps that need to be performed to test proxy configuration
  * based on the current state.
  * @param pss: Structure that holds variables that persist per Websocket session.
  */
@@ -478,38 +1584,19 @@ void test_config(struct per_session_data__yi_hack_v3_test_proxy *pss)
 	switch (pss->state)
 	{
 		case INIT:
-			// If an instance of the test is not currently running,
-			// start the testing process
-			if (pss->pid == 0)
-			{
-				pss->iteration = 1;
-				pss->progress = 1;
-				pss->progress_num = 8;
-				pss->state = GET_INFO;
+			pss->iteration = 1;
+			pss->progress = 1;
+			pss->progress_num = 8;
+			pss->state = GET_INFO;
 
-				pss->nwa_back++;
-				pss->next_write_action[pss->nwa_back%BUFFER_SIZE] = SEND_PROGRESS;
-				pss->nwa_cur++;
-			}
-			// Can only run the test one instance at a time per session
-			else
-			{
-				pss->nwa_back++;
-				pss->next_notification[pss->nwa_back%BUFFER_SIZE].nt = ERROR;
-				pss->next_notification[pss->nwa_back%BUFFER_SIZE].code = errno;
-				sprintf(pss->next_notification[pss->nwa_back%BUFFER_SIZE].message
-						, "ERROR: Already started testing proxy."
-								"Can not run more than one instance at a time.\n"
-						, errno);
-				pss->next_write_action[pss->nwa_back%BUFFER_SIZE] = SEND_NOTIFICATION;
-				pss->nwa_cur++;
-				lwsl_err(pss->next_notification[pss->nwa_back%BUFFER_SIZE].message);
-				return;
-			}
+			pss->nwa_back++;
+			pss->next_write_action[pss->nwa_back%BUFFER_SIZE] = SEND_PROGRESS;
+			pss->nwa_cur++;
 
 			break;
 
 		case GET_INFO:
+			// Execute child process
 			lejp_construct(&pss->ctx, test_proxy_cb, pss, proxy_json,
 					ARRAY_SIZE(proxy_json));
 			rv = execute_process(pss->infd, pss->outfd, pss->errfd, &pss->pid
@@ -526,6 +1613,7 @@ void test_config(struct per_session_data__yi_hack_v3_test_proxy *pss)
 				pss->next_write_action[pss->nwa_back%BUFFER_SIZE] = SEND_NOTIFICATION;
 				pss->nwa_cur++;
 				lwsl_err(pss->next_notification[pss->nwa_back%BUFFER_SIZE].message);
+				pss->state = CLOSE;
 				return;
 			}
 			else if (rv == 0)
@@ -598,6 +1686,7 @@ void test_config(struct per_session_data__yi_hack_v3_test_proxy *pss)
 			break;
 
 		case GET_PROXY_INFO:
+			// Execute child process
 			lejp_construct(&pss->ctx, test_proxy_cb, pss, proxy_json
 					, ARRAY_SIZE(proxy_json));
 			rv = execute_process(pss->infd, pss->outfd, pss->errfd, &pss->pid
@@ -614,6 +1703,7 @@ void test_config(struct per_session_data__yi_hack_v3_test_proxy *pss)
 				pss->next_write_action[pss->nwa_back%BUFFER_SIZE] = SEND_NOTIFICATION;
 				pss->nwa_cur++;
 				lwsl_err(pss->next_notification[pss->nwa_back%BUFFER_SIZE].message);
+				pss->state = CLOSE;
 				return;
 			}
 			else if (rv == 0)
@@ -749,10 +1839,10 @@ int session_read(struct per_vhost_data__yi_hack_v3_test_proxy *vhd
 
 	// Received valid request
 	if (strcmp(token, "TEST_CONFIG") == 0 || strcmp(token, "TEST_LIST") == 0 ||
-			strcmp(token, "DOWNLOAD_LIST") == 0)
+			strcmp(token, "DOWNLOAD_LIST") == 0 || strcmp(token, "TEST_STOP") == 0)
 	{
 		// Can only run one test at a time per session
-		if (pss->state != IDLE)
+		if (pss->state != IDLE && strcmp(token, "TEST_STOP") != 0)
 		{
 			pss->nwa_back++;
 			pss->next_notification[pss->nwa_back%BUFFER_SIZE].nt = ERROR;
@@ -779,6 +1869,10 @@ int session_read(struct per_vhost_data__yi_hack_v3_test_proxy *vhd
 		else if (strcmp(token, "DOWNLOAD_LIST") == 0)
 		{
 			pss->type = DOWNLOAD_LIST;
+		}
+		else if (strcmp(token, "TEST_STOP") == 0)
+		{
+			pss->stopping = true;
 		}
 
 		pss->state = INIT;
@@ -807,12 +1901,13 @@ int session_write(struct per_vhost_data__yi_hack_v3_test_proxy *vhd,
 		case SEND_INFO:
 			// Prepare to send data in JSON format
 			n = sprintf((char *)buf, "{\n\"message\":\"SEND_INFO\",\n"
-					"\"return_value\":\"%d\",\n\"iteration\":\"%d\",\n\"ip\":\"%s\",\n"
-					"\"hostname\":\"%s\",\n\"city\":\"%s\",\n\"region\":\"%s\",\n"
-					"\"country\":\"%s\",\n\"loc\":\"%s\",\n\"org\":\"%s\",\n"
-					"\"postal\":\"%s\"\n}"
-					, pss->test_information.return_value, pss->test_information.iteration
-					, pss->test_information.ip, pss->test_information.hostname, pss->test_information.city
+					"\"index\":\"%d\",\n\"return_value\":\"%d\",\n"
+					"\"iteration\":\"%d\",\n\"ip\":\"%s\",\n\"hostname\":\"%s\",\n"
+					"\"city\":\"%s\",\n\"region\":\"%s\",\n\"country\":\"%s\",\n"
+					"\"loc\":\"%s\",\n\"org\":\"%s\",\n\"postal\":\"%s\"\n}"
+					, pss->test_information.index, pss->test_information.return_value
+					, pss->test_information.iteration, pss->test_information.ip
+					, pss->test_information.hostname, pss->test_information.city
 					, pss->test_information.region, pss->test_information.country
 					, pss->test_information.location, pss->test_information.network
 					, pss->test_information.postal);
@@ -850,12 +1945,13 @@ int session_write(struct per_vhost_data__yi_hack_v3_test_proxy *vhd,
 		case SEND_PROXY_INFO:
 			// Prepare to send data in JSON format
 			n = sprintf((char *)buf, "{\n\"message\":\"SEND_PROXY_INFO\",\n"
-					"\"return_value\":\"%d\",\n\"iteration\":\"%d\",\n\"ip\":\"%s\",\n"
-					"\"hostname\":\"%s\",\n\"city\":\"%s\",\n\"region\":\"%s\",\n"
-					"\"country\":\"%s\",\n\"loc\":\"%s\",\n\"org\":\"%s\",\n"
-					"\"postal\":\"%s\"\n}"
-					, pss->test_information.return_value, pss->test_information.iteration
-					, pss->test_information.ip, pss->test_information.hostname, pss->test_information.city
+					"\"index\":\"%d\",\n\"return_value\":\"%d\",\n"
+					"\"iteration\":\"%d\",\n\"ip\":\"%s\",\n\"hostname\":\"%s\",\n"
+					"\"city\":\"%s\",\n\"region\":\"%s\",\n\"country\":\"%s\",\n"
+					"\"loc\":\"%s\",\n\"org\":\"%s\",\n\"postal\":\"%s\"\n}"
+					, pss->test_information.index, pss->test_information.return_value
+					, pss->test_information.iteration, pss->test_information.ip
+					, pss->test_information.hostname, pss->test_information.city
 					, pss->test_information.region, pss->test_information.country
 					, pss->test_information.location, pss->test_information.network
 					, pss->test_information.postal);
@@ -980,6 +2076,57 @@ int session_write(struct per_vhost_data__yi_hack_v3_test_proxy *vhd,
 			// Remove action from the FIFO buffer
 			pss->nwa_front++;
 			pss->nwa_cur--;
+			break;
+
+		case SEND_LIST:
+			if (pss->current != NULL)
+			{
+				// Prepare to send data in JSON format
+				n = sprintf((char *)buf, "{\n\"message\":\"SEND_LIST\",\n"
+						"\"index\":\"%d\",\n\"proxy\":\"%s\"\n}"
+						, pss->current->num, pss->current->line);
+
+				// Send the data
+				m = lws_write(pss->wsi, buf, n, LWS_WRITE_TEXT);
+				if (m < n)
+				{
+					pss->nwa_back++;
+					pss->next_notification[pss->nwa_back%BUFFER_SIZE].nt = ERROR;
+					pss->next_notification[pss->nwa_back%BUFFER_SIZE].code = errno;
+					sprintf(pss->next_notification[pss->nwa_back%BUFFER_SIZE].message,
+							"ERROR (%d): Error writing to yi-hack-v3_test_proxy Websocket.\n"
+							, errno);
+					pss->next_write_action[pss->nwa_back%BUFFER_SIZE] =
+							SEND_NOTIFICATION;
+					pss->nwa_cur++;
+					lwsl_err(pss->next_notification[pss->nwa_back%BUFFER_SIZE].message);
+					return -1;
+				}
+
+				// Remove action from the FIFO buffer
+				pss->nwa_front++;
+				pss->nwa_cur--;
+
+				// If there are more proxy servers in the list, place in FIFO buffer
+				if (pss->current->next != NULL)
+				{
+					pss->current = pss->current->next;
+					pss->nwa_back++;
+					pss->next_write_action[pss->nwa_back%BUFFER_SIZE] = SEND_LIST;
+					pss->nwa_cur++;
+				}
+				else
+				{
+					pss->current = pss->head;
+				}
+			}
+			else
+			{
+				// Remove nonsense action from the FIFO buffer
+				pss->nwa_front++;
+				pss->nwa_cur--;
+			}
+			break;
 		
 		default:
 			break;
@@ -1014,10 +2161,12 @@ callback_yi_hack_v3_test_proxy(struct lws *wsi, enum lws_callback_reasons reason
 			vhd->context = lws_get_context(wsi);
 			vhd->protocol = lws_get_protocol(wsi);
 			vhd->vhost = lws_get_vhost(wsi);
+			vhd->fops_plat = lws_get_fops(vhd->context);
 
 			break;
 
 		case LWS_CALLBACK_PROTOCOL_DESTROY:
+			lwsl_err("0");
 			if (!vhd)
 				break;
 
@@ -1026,6 +2175,11 @@ callback_yi_hack_v3_test_proxy(struct lws *wsi, enum lws_callback_reasons reason
 		case LWS_CALLBACK_ESTABLISHED:
 			pss->wsi = wsi;
 			session_init(pss);
+
+			break;
+
+		case LWS_CALLBACK_CLOSED:
+			cleanup(pss);
 
 			break;
 
@@ -1050,8 +2204,10 @@ callback_yi_hack_v3_test_proxy(struct lws *wsi, enum lws_callback_reasons reason
 					test_config(pss);
 					break;
 				case TEST_LIST:
+					test_list(vhd, pss, buf);
 					break;
 				case DOWNLOAD_LIST:
+					download_list(vhd, pss, buf);
 					break;
 			}
 			determine_next_action(vhd, pss);

@@ -1,0 +1,285 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+	<meta charset="utf-8">
+	<meta http-equiv="X-UA-Compatible" content="IE=edge">
+	<meta name="viewport" content="width=device-width, initial-scale=1">
+	<!-- The above 3 meta tags *must* come first in the head; any other head content must come *after* these tags -->
+	<script src="/js/lws-common.js"></script>
+	<title></title>
+	<!-- Bootstrap core CSS -->
+	<link href="/css/bootstrap.min.css" rel="stylesheet">
+	<!-- Bootstrap theme -->
+	<link href="/css/bootstrap-theme.min.css" rel="stylesheet">
+	<!-- IE10 viewport hack for Surface/desktop Windows 8 bug -->
+	<link href="/css/ie10-viewport-bug-workaround.css" rel="stylesheet">
+	<!-- Custom styles for this template -->
+	<link href="/css/navbar.css" rel="stylesheet">
+
+</head>
+
+<body>
+
+	<div class="container">
+
+		<!-- Static navbar -->
+		<nav class="navbar navbar-inverse">
+			<div class="container-fluid">
+				<div class="navbar-header">
+					<button type="button" class="navbar-toggle collapsed" data-toggle="collapse" data-target="#navbar" aria-expanded="false" aria-controls="navbar">
+						<span class="sr-only">Toggle navigation</span>
+						<span class="icon-bar"></span>
+						<span class="icon-bar"></span>
+						<span class="icon-bar"></span>
+					</button>
+					<a class="navbar-brand"><div class=camera>Yi Camera</div></a>
+				</div>
+				<div id="navbar" class="navbar-collapse collapse">
+					<ul class="nav navbar-nav">
+						<li class="active"><a href="proxy_config.html">ProxyChains-ng</a></li>
+						<li><a href="config.html">System Config</a></li>
+						<li><a href="about.html">About</a></li>
+						<li><a href="reboot.html">Reboot</a></li>
+					</ul>
+				</div><!--/.nav-collapse -->
+			</div><!--/.container-fluid -->
+		</nav>
+
+		<!-- Main component for a primary marketing message or call to action -->
+		<div class="page-header">
+			<h1>ProxyChains-ng Test Proxy List</h1>
+		</div>
+
+		<div class="progress">
+			<div class="progress-bar" role="progressbar" style="width: 0%;"></div>
+		</div>
+
+		<div id="error"></div>
+		<div id="warning"></div>
+		<div id="information"></div>
+		
+		<table class="table table-bordered table-striped table-condensed">
+			<thead>
+				<tr>
+					<th>#</th>
+					<th>Proxy Server</th>
+					<th>Country</th>
+					<th>Result</th>
+					<th> </th>
+				</tr>
+			</thead>
+			<tbody id="test_list_table"></tbody>
+		</table>
+		<h4><strong>Log</strong></h4>
+		<pre class="pre-scrollable small" id="PROXYCHAINSNG_log" name="log"></pre>
+		<p>Service Provided by <a href="http://ipinfo.io">ipinfo.io</a>.</p>
+		<a class="btn btn-primary" href="proxy_config.html" role="button">Back</a>
+		<button type="button" class="btn btn-primary" id="stop">Stop</button>
+	</div>
+
+	<!-- Bootstrap core JavaScript
+	================================================== -->
+	<!-- Placed at the end of the document so the pages load faster -->
+	<script src="https://ajax.googleapis.com/ajax/libs/jquery/1.12.4/jquery.min.js"></script>
+	<!--<script>window.jQuery || document.write('<script src="js/vendor/jquery.min.js"><\/script>')</script>-->
+	<script src="/js/bootstrap.min.js"></script>
+	<!-- IE10 viewport hack for Surface/desktop Windows 8 bug -->
+	<script src="/js/ie10-viewport-bug-workaround.js"></script>
+
+<script>
+document.getElementById('stop').onclick = stop;
+var info_num;
+
+function get_appropriate_ws_url()
+{
+	var pcol;
+	var u = document.URL;
+
+	/*
+	 * We open the websocket encrypted if this page came on an
+	 * https:// url itself, otherwise unencrypted
+	 */
+
+	if (u.substring(0, 5) == "https") {
+		pcol = "wss://";
+		u = u.substr(8);
+	} else {
+		pcol = "ws://";
+		if (u.substring(0, 4) == "http")
+			u = u.substr(7);
+	}
+
+	u = u.split('/');
+
+	/* + "/xxx" bit is for IE10 workaround */
+
+	return pcol + u[0] + "/xxx";
+}
+
+/* yi-hack-v3_info protocol */
+	
+	var socket_info;
+
+	if (typeof MozWebSocket != "undefined") {
+		socket_info = new MozWebSocket(get_appropriate_ws_url(),
+				   "yi-hack-v3_info");
+	} else {
+		socket_info = new WebSocket(get_appropriate_ws_url(),
+				   "yi-hack-v3_info");
+	}
+
+	try {
+		socket_info.onopen = function() {
+			init();
+		} 
+
+		socket_info.onmessage = function got_packet(msg) {
+			jso = JSON.parse(msg.data);
+			console.log(msg.data);
+
+			if (jso.message == "SEND_CAM_INFO") {
+				document.title = jso.camera;
+
+				document.getElementsByClassName("camera")[0].textContent = jso.camera;
+			}
+		} 
+
+		socket_info.onclose = function(){
+			
+		}
+	} catch(exception) {
+		alert('<p>Error' + exception);  
+	}
+
+function init() {
+	socket_info.send("SEND_CAM_INFO\n");
+}
+
+/* yi-hack-v3_test_proxy protocol */
+	
+	var socket_test_proxy;
+
+	if (typeof MozWebSocket != "undefined") {
+		socket_test_proxy = new MozWebSocket(get_appropriate_ws_url(),
+				   "yi-hack-v3_test_proxy");
+	} else {
+		socket_test_proxy = new WebSocket(get_appropriate_ws_url(),
+				   "yi-hack-v3_test_proxy");
+	}
+
+	try {
+		socket_test_proxy.onopen = function() {
+			init_test_proxy();
+		} 
+
+		socket_test_proxy.onmessage = function got_packet(msg) {
+			jso = JSON.parse(msg.data);
+			console.log(msg.data);
+
+			if (jso.message == "SEND_LOG") {
+				switch (jso.l_type) {
+					case "0":
+						document.getElementById("PROXYCHAINSNG_log").innerHTML += "<span class=\"text-primary\">" + jso.l_message + "</span>";
+						break;
+					case "1":
+						document.getElementById("PROXYCHAINSNG_log").innerHTML += "<span class=\"text-success\">" + jso.l_message + "</span>";
+						break;
+					case "2":
+						document.getElementById("PROXYCHAINSNG_log").innerHTML += "<span class=\"text-danger\">" + jso.l_message + "</span>";
+						break;
+					case "3":
+						document.getElementById("PROXYCHAINSNG_log").innerHTML += "<span class=\"text-primary\">" + jso.l_message + "</span>";
+						break;
+				}
+			} else if (jso.message == "SEND_PROXY_INFO") {
+				var check_class_name;
+				var check_result;
+				var country_class_name;
+				var country_result;
+				var proxy_class_name;
+				var proxy_result;
+				if (jso.country) {
+					country_result = jso.country;
+				} else {
+					country_result = "&#8213;";
+				}
+				if (parseInt(jso.return_value) == 0) {
+					proxy_result = "<span class=\"label label-success\">\u2714</span>";
+					check_result = true;
+					
+				} else {
+					proxy_result = "<span class=\"label label-danger\">\u2718</span>";
+					check_result = false;
+				}
+				check_class_name = "check_" + jso.index;
+				country_class_name = "country_" + jso.index;
+				proxy_class_name = "proxy_" + jso.index + "_" + jso.iteration;
+				document.getElementsByClassName(check_class_name)[0].checked = check_result;
+				document.getElementsByClassName(country_class_name)[0].innerHTML = country_result;
+				document.getElementsByClassName(proxy_class_name)[0].innerHTML = proxy_result;
+			} else if (jso.message == "SEND_NOTIFICATION") {
+				var message;
+
+				switch (jso.n_type) {
+					case "0":
+						message = "<div class=\"alert alert-danger\" role=\"alert\"><strong>ERROR:</strong> " + jso.n_message + "</div>";
+						document.getElementById("error").innerHTML += message;
+						break;
+					case "1":
+						message = "<div class=\"alert alert-warning\" role=\"alert\"><strong>WARNING:</strong> " + jso.n_message + "</div>";
+						document.getElementById("error").innerHTML += message;
+						break;
+					case "2":
+						message = "<div class=\"alert alert-success\" role=\"alert\" id=\"" + info_num + "\">" + jso.n_message + "</div>";
+						document.getElementById("information").innerHTML += message;
+						setTimeout(remove_information, 2000, info_num);
+						info_num++;
+						break;
+				}
+			} else if (jso.message == "SEND_PROGRESS") {
+				document.getElementsByClassName("progress-bar")[0].setAttribute("style","width:" + jso.percentage + "%");
+			} else if (jso.message == "SEND_LIST") {
+				var table = document.getElementById("test_list_table");
+				var row = table.insertRow(jso.index - 1);
+				var cell1 = row.insertCell(0);
+				var cell2 = row.insertCell(1);
+				var cell3 = row.insertCell(2);
+				var cell4 = row.insertCell(3);
+				var cell5 = row.insertCell(4);
+				
+				cell1.innerHTML = jso.index;
+				cell2.innerHTML = jso.proxy;
+				cell3.innerHTML = "<span class=country_" + jso.index + ">&#8213;</span>"
+				cell4.innerHTML = "<span class=proxy_" + jso.index + "_1>&#8213;</span> <span class=proxy_" + jso.index + "_2>&#8213;</span> <span class=proxy_" + jso.index + "_3>&#8213;</span>";
+				cell5.innerHTML = "<input type=\"checkbox\" value=\"\" class=check_" + jso.index + ">"
+			}
+		} 
+
+		socket_test_proxy.onclose = function(){
+			
+		}
+	} catch(exception) {
+		alert('<p>Error' + exception);  
+	}
+
+function init_test_proxy() {
+	document.getElementById("PROXYCHAINSNG_log").value = "";
+	socket_test_proxy.send("TEST_LIST\n");
+}
+
+function stop() {
+	socket_test_proxy.send("TEST_STOP\n");
+	console.log("TEST_STOP\n");
+}
+
+function remove_information(x) {
+	var element = document.getElementById(x);
+	element.parentNode.removeChild(element);
+}
+
+</script>
+	
+</body>
+
+</html>
