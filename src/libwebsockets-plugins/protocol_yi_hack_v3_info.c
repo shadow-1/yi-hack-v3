@@ -62,6 +62,16 @@ struct notification
 };
 
 /**
+ * Base ProxyChains-ng config when saving a proxy server list.
+ */
+char base_config[] =
+	"random_chain\n\n"
+	"chain_len = 1\n\n"
+	"tcp_read_time_out 15000\n\n"
+	"tcp_connect_time_out 8000\n\n"
+	"[ProxyList]";
+
+/**
  * Data structure that contains all variables that are stored per plugin instance.
  */
 struct per_vhost_data__yi_hack_v3_info
@@ -113,7 +123,7 @@ int protocol_init(struct per_vhost_data__yi_hack_v3_info *vhd, char *buf)
 	{
 		lwsl_err("ERROR (%d): Failed to open file - %s.\n", errno, HACK_INFO_FILE);
 		return -1;
-	}	
+	}
 
 	// Read contents of the info file
 	file_ret = lws_vfs_file_read(fop_fd, &fop_len, buf, 512);
@@ -682,14 +692,14 @@ int session_read(struct per_vhost_data__yi_hack_v3_info *vhd,
 		{
 			return -1;
 		}
-		
+
 		if (strcmp(token, "OPEN") == 0)
 			current_read_action = OPEN;
 		else if (strcmp(token, "APPEND") == 0)
 			current_read_action = APPEND;
 		else
 			current_read_action = CLOSE;
-		
+
 		if (current_read_action == OPEN)
 		{
 			// Open the proxychains-ng config file for writing,
@@ -719,6 +729,105 @@ int session_read(struct per_vhost_data__yi_hack_v3_info *vhd,
 			n = strlen(token);
 
 			// Write config file
+			file_ret = lws_vfs_file_write(fop_fd, &fop_len, token, n);
+
+			if (file_ret < 0)
+			{
+				pss->nwa_back++;
+				pss->next_notification[pss->nwa_back%BUFFER_SIZE].nt = ERROR;
+				pss->next_notification[pss->nwa_back%BUFFER_SIZE].code = errno;
+				sprintf(pss->next_notification[pss->nwa_back%BUFFER_SIZE].message,
+						"ERROR (%d): Failed to write file - %s.\n", errno
+						, PROXYCHAINSNG_CONFIG_FILE);
+				pss->next_write_action[pss->nwa_back%BUFFER_SIZE] = SEND_NOTIFICATION;
+				pss->nwa_cur++;
+				lwsl_err(pss->next_notification[pss->nwa_back%BUFFER_SIZE].message);
+				return -1;
+			}
+		}
+
+		if (current_read_action == CLOSE)
+		{
+			// Close the file and add notification to the FIFO buffer
+			lws_vfs_file_close(&fop_fd);
+
+			pss->nwa_back++;
+			pss->next_notification[pss->nwa_back%BUFFER_SIZE].nt = INFORMATION;
+			sprintf(pss->next_notification[pss->nwa_back%BUFFER_SIZE].message
+					, "Configuration saved.");
+			pss->next_write_action[pss->nwa_back%BUFFER_SIZE] = SEND_NOTIFICATION;
+			pss->nwa_cur++;
+		}
+	}
+	// Received request to save proxychains-ng list of proxy servers
+	else if (strcmp(token, "SAVE_PROXYCHAINSNG_LIST") == 0)
+	{
+		enum read_action current_read_action;
+
+		// Split the incoming data by the newline
+		token = strtok(NULL, "\n\0");
+
+		// If nothing is found after the split, return error
+		if (token == NULL)
+		{
+			return -1;
+		}
+
+		if (strcmp(token, "OPEN") == 0)
+			current_read_action = OPEN;
+		else if (strcmp(token, "APPEND") == 0)
+			current_read_action = APPEND;
+		else
+			current_read_action = CLOSE;
+
+		if (current_read_action == OPEN)
+		{
+			// Open the proxychains-ng config file for writing,
+			// replacing the file if it exists
+			flags = O_WRONLY | O_TRUNC;
+			fop_fd = lws_vfs_file_open(vhd->fops_plat, PROXYCHAINSNG_CONFIG_FILE, &flags);
+
+			if (!fop_fd)
+			{
+				pss->nwa_back++;
+				pss->next_notification[pss->nwa_back%BUFFER_SIZE].nt = ERROR;
+				pss->next_notification[pss->nwa_back%BUFFER_SIZE].code = errno;
+				sprintf(pss->next_notification[pss->nwa_back%BUFFER_SIZE].message,
+						"ERROR (%d): Failed to open file - %s.\n", errno
+						, PROXYCHAINSNG_CONFIG_FILE);
+				pss->next_write_action[pss->nwa_back%BUFFER_SIZE] = SEND_NOTIFICATION;
+				pss->nwa_cur++;
+				lwsl_err(pss->next_notification[pss->nwa_back%BUFFER_SIZE].message);
+				return -1;
+			}
+
+			// Write default initial portion of the ProxyChains-ng config file
+			n = strlen(base_config);
+			file_ret = lws_vfs_file_write(fop_fd, &fop_len, base_config, n);
+
+			if (file_ret < 0)
+			{
+				pss->nwa_back++;
+				pss->next_notification[pss->nwa_back%BUFFER_SIZE].nt = ERROR;
+				pss->next_notification[pss->nwa_back%BUFFER_SIZE].code = errno;
+				sprintf(pss->next_notification[pss->nwa_back%BUFFER_SIZE].message,
+						"ERROR (%d): Failed to write file - %s.\n", errno
+						, PROXYCHAINSNG_CONFIG_FILE);
+				pss->next_write_action[pss->nwa_back%BUFFER_SIZE] = SEND_NOTIFICATION;
+				pss->nwa_cur++;
+				lwsl_err(pss->next_notification[pss->nwa_back%BUFFER_SIZE].message);
+				return -1;
+			}
+		}
+
+		token = strtok(NULL, "");
+
+		if (token != NULL)
+		{
+			n = strlen(token);
+
+			// Write config file
+			file_ret = lws_vfs_file_write(fop_fd, &fop_len, "\n", 1);
 			file_ret = lws_vfs_file_write(fop_fd, &fop_len, token, n);
 
 			if (file_ret < 0)

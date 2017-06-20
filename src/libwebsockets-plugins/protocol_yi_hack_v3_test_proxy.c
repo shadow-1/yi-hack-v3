@@ -567,6 +567,8 @@ void cleanup(struct per_session_data__yi_hack_v3_test_proxy *pss)
 		pss->errfd[1] = 0;
 		pss->pid = 0;
 	}
+
+	pss->stopping = false;
 }
 
 /**
