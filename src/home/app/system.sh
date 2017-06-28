@@ -8,6 +8,11 @@ get_config()
 	grep $1 $CONF_FILE | cut -d "=" -f2
 }
 
+if [ -f "/home/app/yi-hack-v3.7z" ]; then
+        7za x /home/app/yi-hack-v3.7z
+	rm /home/app/yi-hack-v3.7z
+fi
+
 if [[ $(get_config HTTPD) == "yes" ]] ; then
 	lwsws -D
 fi
@@ -20,5 +25,6 @@ if [[ $(get_config FTPD) == "yes" ]] ; then
 	tcpsvd -vE 0.0.0.0 21 ftpd -w &
 fi
 
-/tmp/sd/startup.sh
-
+if [ -f "/tmp/sd/startup.sh" ]; then
+	/tmp/sd/startup.sh
+fi

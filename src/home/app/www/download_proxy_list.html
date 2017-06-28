@@ -74,9 +74,28 @@
 		<h4><strong>Log</strong></h4>
 		<pre class="pre-scrollable small" id="PROXYCHAINSNG_log" name="log"></pre>
 		<p>Service Provided by <a href="https://freevpn.ninja/">freevpn.ninja</a> and <a href="http://ipinfo.io">ipinfo.io</a>.</p>
-		<a class="btn btn-primary" href="proxy_config.html" role="button">Back</a>
-		<button type="button" class="btn btn-primary" id="start_stop">Stop</button>
-		<button type="button" class="btn btn-primary" id="save_proxy_list">Save Proxy Servers</button>
+
+		<div class="col-sm-12 button-wrapper">
+			<a class="btn btn-primary" href="proxy_config.html" role="button">Back</a>
+			<button type="button" class="btn btn-primary" id="stop">Stop</button>
+			<button type="button" class="btn btn-primary" id="save_proxy_list">Save Selected Proxies</button>
+		</div>
+		<div class="col-sm-4">
+			<div class="input-group">
+				<div class="input-group-btn">
+					<button type="button" id="download_num" class="btn btn-primary">Download Proxies</button>
+					<button type="button" id="carat" class="btn btn-primary dropdown-toggle" data-toggle="dropdown" aria-haspopup="true" aria-expanded="false">
+						<span class="caret"></span>
+					</button>
+					<ul class="dropdown-menu">
+						<li><a id="download_all">Download All Proxies</a></li>
+					</ul>
+				</div>
+				<div>
+					<input type="text" id="proxy_num" class="form-control" value="10"></input>
+				</div>
+			</div>
+		</div>
 	</div>
 
 	<!-- Bootstrap core JavaScript
@@ -89,10 +108,11 @@
 	<script src="/js/ie10-viewport-bug-workaround.js"></script>
 
 <script>
-document.getElementById('start_stop').onclick = start_stop;
+document.getElementById('download_num').onclick = download_num;
+document.getElementById('download_all').onclick = download_all;
+document.getElementById('stop').onclick = stop;
 document.getElementById('save_proxy_list').onclick = save_proxy_list;
 var info_num;
-var stop;
 
 function get_appropriate_ws_url()
 {
@@ -166,7 +186,7 @@ function get_appropriate_ws_url()
 			}
 		} 
 
-		socket_info.onclose = function(){
+		socket_info.onclose = function() {
 			
 		}
 	} catch(exception) {
@@ -174,7 +194,6 @@ function get_appropriate_ws_url()
 	}
 
 function init() {
-	stop = true;
 	socket_info.send("SEND_CAM_INFO\n");
 }
 
@@ -182,6 +201,7 @@ function save_proxy_list() {
 	var message;
 	var proxy_line = document.getElementsByClassName("proxy_line");
 	var first_time = true;
+
 	for(var i = 0; i < proxy_line.length; i++)
 	{
 		if (document.getElementsByClassName("check").item(i).checked == true) {
@@ -196,11 +216,17 @@ function save_proxy_list() {
 			socket_info.send(message);
 		}
 	}
-	socket_info.send("SAVE_PROXYCHAINSNG_LIST\nCLOSE\n");
+
+	if (first_time == true) {
+		message = "<div class=\"alert alert-info\" role=\"alert\"><strong>INFORMATION:</strong> At least one proxy server has to be selected to save.</div>";
+		document.getElementById("information").innerHTML += message;
+	} else {
+		socket_info.send("SAVE_PROXYCHAINSNG_LIST\nCLOSE\n");
+	}
 }
 
 /* yi-hack-v3_test_proxy protocol */
-	
+
 	var socket_test_proxy;
 
 	if (typeof MozWebSocket != "undefined") {
@@ -213,7 +239,8 @@ function save_proxy_list() {
 
 	try {
 		socket_test_proxy.onopen = function() {
-			init_test_proxy();
+			document.getElementById("stop").disabled = true;
+			document.getElementById("save_proxy_list").disabled = true;
 		} 
 
 		socket_test_proxy.onmessage = function got_packet(msg) {
@@ -276,10 +303,11 @@ function save_proxy_list() {
 						setTimeout(remove_information, 2000, info_num);
 						info_num++;
 
-						stop = false;
-						document.getElementById("start_stop").innerHTML = "Retry";
-						document.getElementById("start_stop").disabled = false;
+						document.getElementById("stop").disabled = true;
 						document.getElementById("save_proxy_list").disabled = false;
+						document.getElementById("download_num").disabled = false;
+						document.getElementById("proxy_num").disabled = false;
+						document.getElementById("carat").disabled = false;
 
 						break;
 				}
@@ -309,24 +337,56 @@ function save_proxy_list() {
 		alert('<p>Error' + exception);  
 	}
 
-function init_test_proxy() {
+function isPositiveInteger(n) {
+    return /^\+?\d+$/.test(n);
+}
+
+function init_test_proxy(x) {
+	var element = document.getElementById("validation_error");
+
+	if (element) {
+		document.getElementById("proxy_num").parentElement.className = "";
+		document.getElementById("proxy_num").parentElement.removeChild(element);
+	}
+
 	document.getElementsByClassName("progress-bar")[0].setAttribute("style","width:0%");
 	document.getElementById("error").innerHTML = "";
 	document.getElementById("test_list_table").innerHTML = "";
 	document.getElementById("PROXYCHAINSNG_log").innerHTML = "";
+	document.getElementById("stop").disabled = false;
 	document.getElementById("save_proxy_list").disabled = true;
+	document.getElementById("download_num").disabled = true;
+	document.getElementById("proxy_num").disabled = true;
+	document.getElementById("carat").disabled = true;
 	document.getElementById("PROXYCHAINSNG_log").value = "";
-	socket_test_proxy.send("DOWNLOAD_LIST\n");
+	socket_test_proxy.send("DOWNLOAD_LIST\n" + x + "\n");
 }
 
-function start_stop() {
-	if (stop == true) {
-		socket_test_proxy.send("TEST_STOP\n");
-		document.getElementById("start_stop").disabled = true;
+function stop() {
+	socket_test_proxy.send("TEST_STOP\n");
+	document.getElementById("stop").disabled = true;
+}
+
+function download_all() {
+	init_test_proxy("ALL");
+}
+
+function download_num() {
+	var value = document.getElementById("proxy_num").value;
+
+	if (isPositiveInteger(value)) {
+		init_test_proxy(value);
 	} else {
-		stop = true;
-		document.getElementById("start_stop").innerHTML = "Stop";
-		init_test_proxy();
+		var element = document.getElementById("validation_error");
+
+		if (!element) {
+			document.getElementById("proxy_num").parentElement.className = "has-error";
+			element = document.createElement("span");
+			element.className = "form-control-feedback";
+			element.id = "validation_error";
+			element.textContent = "\u2718";
+			document.getElementById("proxy_num").parentElement.appendChild(element);
+		}
 	}
 }
 
@@ -336,7 +396,8 @@ function remove_information(x) {
 }
 
 </script>
-	
+
 </body>
 
 </html>
+

@@ -211,6 +211,7 @@ struct log
  */
 struct proxy
 {
+	unsigned int idx;
 	unsigned int num;
 	char *line;
 	struct proxy *next;
@@ -276,6 +277,9 @@ struct per_session_data__yi_hack_v3_test_proxy
 
 	struct proxy *head;
 	struct proxy *current;
+
+	long download_num;
+	bool download_all;
 };
 
 struct per_vhost_data__yi_hack_v3_test_proxy *vhd;
@@ -349,6 +353,8 @@ void session_init(struct per_session_data__yi_hack_v3_test_proxy *pss)
 	pss->current = NULL;
 
 	pss->stopping = false;
+
+	pss->download_all = true;
 }
 
 /**
@@ -571,6 +577,86 @@ void cleanup(struct per_session_data__yi_hack_v3_test_proxy *pss)
 	pss->stopping = false;
 }
 
+long rand_num(long min, long max)
+{
+    long r;
+    const long range = 1 + max - min;
+    const long buckets = RAND_MAX / range;
+    const long limit = buckets * range;
+
+    do
+    {
+        r = rand();
+    } while (r >= limit);
+
+    return min + (r / buckets);
+}
+
+void randomise_download_list(struct per_session_data__yi_hack_v3_test_proxy *pss, long total)
+{
+	struct proxy *new_head;
+	struct proxy *new_current;
+	struct proxy *link;
+	long i, j, k;
+
+	new_head = NULL;
+	new_current = NULL;
+
+	pss->current = pss->head;
+
+	srand((unsigned int)time(NULL));
+
+	for (i = 1; i <= pss->download_num; i++)
+	{
+		j = rand_num(1, total);
+
+		for (k = 1; k < j; k++)
+		{
+			pss->current = pss->current->next;
+		}
+
+		// Dynamically allocate new node for Linked List
+		link = (struct proxy*)malloc(sizeof(struct proxy));
+		link->line = (char*)malloc(strlen(pss->current->line) + 1);
+		strcpy(link->line, pss->current->line);
+		link->idx = i;
+		link->num = pss->current->num;
+		link->next = NULL;
+
+		// If there is no head node, this node will become the head
+		if (new_head == NULL)
+		{
+			new_head = link;
+			new_current = link;
+		}
+		// Otherwise join the end of the Linked List
+		else
+		{
+			new_current->next = link;
+			new_current = link;
+		}
+
+		pss->current = pss->head;
+	}
+
+	// Cleanup dynamically allocated proxy list
+	while (pss->head != NULL)
+	{
+		pss->current = pss->head;
+		pss->head = pss->head->next;
+
+		if (pss->current->line != NULL)
+		{
+			free (pss->current->line);
+			pss->current->line = NULL;
+		}
+		free(pss->current);
+	}
+
+	pss->head = new_head;
+	pss->current = new_current;
+}
+
 /**
  * Execute steps that need to be performed to download and test each proxy server
  * that is flagged as being based in Mainland China from the free proxy server
@@ -594,7 +680,7 @@ void download_list(struct per_vhost_data__yi_hack_v3_test_proxy *vhd
 
 	struct proxy *link;
 
-	char temp_string[100];
+	char temp_string[512];
 	char ip[16];
 	char port[6];
 	char proxy[7];
@@ -605,7 +691,7 @@ void download_list(struct per_vhost_data__yi_hack_v3_test_proxy *vhd
 		case INIT:
 			pss->iteration = 1;
 			pss->progress = 1;
-			
+
 			if (pss->stopping)
 			{
 				pss->state = CLOSE;
@@ -616,8 +702,10 @@ void download_list(struct per_vhost_data__yi_hack_v3_test_proxy *vhd
 			}
 
 			break;
-			
+
 		case DOWNLOAD_FILE:
+			// If a request came in to stop the test,
+			// kill the child process if it has started
 			if (pss->stopping)
 			{
 				if (pss->pid != 0)
@@ -626,6 +714,7 @@ void download_list(struct per_vhost_data__yi_hack_v3_test_proxy *vhd
 				}
 			}
 
+			// Execute child process to download proxy file
 			lejp_construct(&pss->ctx, test_proxy_cb, pss, proxy_json,
 					ARRAY_SIZE(proxy_json));
 			rv = execute_process(pss->infd, pss->outfd, pss->errfd, &pss->pid
@@ -685,11 +774,11 @@ void download_list(struct per_vhost_data__yi_hack_v3_test_proxy *vhd
 			}
 
 			break;
-		
+
 		case PARSE_FILE:
 			partial_read = false;
 			i = 0;
-			
+
 			// Open downloaded file and read proxy server lines
 			flags = LWS_O_RDONLY;
 			fop_fd = lws_vfs_file_open(vhd->fops_plat, TEMP_DOWNLOAD_FILE, &flags);
@@ -703,7 +792,7 @@ void download_list(struct per_vhost_data__yi_hack_v3_test_proxy *vhd
 			}
 
 			// Read contents of the downloaded file
-			file_ret = lws_vfs_file_read(fop_fd, &fop_len, buf, 100);
+			file_ret = lws_vfs_file_read(fop_fd, &fop_len, buf, 512);
 
 			if (file_ret < 0)
 			{
@@ -723,6 +812,13 @@ void download_list(struct per_vhost_data__yi_hack_v3_test_proxy *vhd
 				// If a last line was partially read from the last chunk
 				if (partial_read)
 				{
+					// Handle the case that we are at the last line and there are
+					// no further new line characters to be read
+					if (ret == NULL && fop_len < 512)
+					{
+						ret = strchr(buf, '\0');
+					}
+
 					if (ret != NULL)
 					{
 						// Join the last partial line read from the last chunk to the
@@ -794,6 +890,7 @@ void download_list(struct per_vhost_data__yi_hack_v3_test_proxy *vhd
 							link = (struct proxy*)malloc(sizeof(struct proxy));
 							link->line = (char*)malloc(strlen(temp_string) + 1);
 							strcpy(link->line, temp_string);
+							link->idx = i;
 							link->num = i;
 							link->next = NULL;
 
@@ -816,7 +913,7 @@ void download_list(struct per_vhost_data__yi_hack_v3_test_proxy *vhd
 					partial_read = false;
 				}
 
-				// Foe each line in the chunk currently being read
+				// For each line in the chunk currently being read
 				while (ret != NULL)
 				{
 					// Copy the next line from the downloaded file
@@ -886,6 +983,7 @@ void download_list(struct per_vhost_data__yi_hack_v3_test_proxy *vhd
 						link = (struct proxy*)malloc(sizeof(struct proxy));
 						link->line = (char*)malloc(strlen(temp_string) + 1);
 						strcpy(link->line, temp_string);
+						link->idx = i;
 						link->num = i;
 						link->next = NULL;
 
@@ -913,12 +1011,52 @@ void download_list(struct per_vhost_data__yi_hack_v3_test_proxy *vhd
 				partial_read = true;
 
 				// Read contents of the downloaded file
-				file_ret = lws_vfs_file_read(fop_fd, &fop_len, buf, 100);
+				file_ret = lws_vfs_file_read(fop_fd, &fop_len, buf, 512);
 			}
 
 			// Close the config file
 			lws_vfs_file_close(&fop_fd);
 
+			// If no proxy servers were found
+			if (pss->head == NULL)
+			{
+				pss->nwa_back++;
+				pss->next_notification[pss->nwa_back%BUFFER_SIZE].nt = WARNING;
+				sprintf(pss->next_notification[pss->nwa_back%BUFFER_SIZE].message,
+						"Could not find any proxy servers located within Mainland China "
+						"within downloaded proxy list.");
+				pss->next_write_action[pss->nwa_back%BUFFER_SIZE] =
+						SEND_NOTIFICATION;
+				pss->nwa_cur++;
+				pss->stopping = true;
+			}
+			else
+			{
+				// If the requested number of proxy servers exceeds what is available,
+				// test all the proxy servers
+				if (pss->download_num > pss->current->num)
+				{
+					pss->nwa_back++;
+					pss->next_notification[pss->nwa_back%BUFFER_SIZE].nt = WARNING;
+					sprintf(pss->next_notification[pss->nwa_back%BUFFER_SIZE].message,
+							"Downloaded proxy list does not contain %ld proxy servers. "
+							"%d proxy servers have been found."
+							, pss->download_num, pss->current->num);
+					pss->next_write_action[pss->nwa_back%BUFFER_SIZE] =
+							SEND_NOTIFICATION;
+					pss->nwa_cur++;
+					pss->download_all = true;
+				}
+
+				if (!pss->download_all)
+				{
+					randomise_download_list(pss, pss->current->num);
+				}
+				else
+				{
+					pss->download_num = pss->current->num;
+				}
+			}
 			// If we are stopping, go to CLOSE state
 			if (pss->stopping)
 			{
@@ -928,7 +1066,7 @@ void download_list(struct per_vhost_data__yi_hack_v3_test_proxy *vhd
 			// and move onto the next step
 			else
 			{
-				pss->progress_num = (3 * pss->current->num) + 2;
+				pss->progress_num = (3 * pss->download_num) + 2;
 
 				pss->nwa_back++;
 				pss->next_write_action[pss->nwa_back%BUFFER_SIZE] = SEND_PROGRESS;
@@ -1060,7 +1198,7 @@ void download_list(struct per_vhost_data__yi_hack_v3_test_proxy *vhd
 				pss->pid = 0;
 
 				// Send current progress
-				pss->progress = (3 * (pss->current->num - 1)) + pss->iteration + 1;
+				pss->progress = (3 * (pss->current->idx - 1)) + pss->iteration + 1;
 				pss->nwa_back++;
 				pss->next_write_action[pss->nwa_back%BUFFER_SIZE] = SEND_PROGRESS;
 				pss->nwa_cur++;
@@ -1078,7 +1216,7 @@ void download_list(struct per_vhost_data__yi_hack_v3_test_proxy *vhd
 				if (status == 0)
 				{
 					// Send current progress
-					pss->progress = (3 * pss->current->num) + 1;
+					pss->progress = (3 * pss->current->idx) + 1;
 					pss->nwa_back++;
 					pss->next_write_action[pss->nwa_back%BUFFER_SIZE] = SEND_PROGRESS;
 					pss->nwa_cur++;
@@ -1224,7 +1362,7 @@ void test_list(struct per_vhost_data__yi_hack_v3_test_proxy *vhd
 			}
 
 			// Read contents of the config file
-			file_ret = lws_vfs_file_read(fop_fd, &fop_len, buf, 100);
+			file_ret = lws_vfs_file_read(fop_fd, &fop_len, buf, 512);
 
 			if (file_ret < 0)
 			{
@@ -1244,6 +1382,13 @@ void test_list(struct per_vhost_data__yi_hack_v3_test_proxy *vhd
 				// If a last line was partially read from the last chunk
 				if (partial_read)
 				{
+					// Handle the case that we are at the last line and there are
+					// no further new line characters to be read
+					if (ret == NULL && fop_len < 512)
+					{
+						ret = strchr(buf, '\0');
+					}
+
 					if (ret != NULL)
 					{
 						// Join the last partial line read from the last chunk to the
@@ -1279,6 +1424,7 @@ void test_list(struct per_vhost_data__yi_hack_v3_test_proxy *vhd
 						link = (struct proxy*)malloc(sizeof(struct proxy));
 						link->line = (char*)malloc(strlen(token) + 1);
 						strcpy(link->line, token);
+						link->idx = i;
 						link->num = i;
 						link->next = NULL;
 
@@ -1301,36 +1447,53 @@ void test_list(struct per_vhost_data__yi_hack_v3_test_proxy *vhd
 					ret = strchr(token, '\n');
 				}
 
-				// Dynamically allocate memory for a new node
-				i++;
-				link = (struct proxy*)malloc(sizeof(struct proxy));
-				link->line = (char*)malloc(strlen(token) + 1);
-				strcpy(link->line, token);
-				link->num = i;
-				link->next = NULL;
-
-				// If there is no head node, this node will become the head
-				if (pss->head == NULL)
+				if (strlen(token) > 0)
 				{
-					pss->head = link;
-					pss->current = link;
-				}
-				// Otherwise join the end of the Linked List
-				else
-				{
-					pss->current->next = link;
-					pss->current = link;
-				}
+					// Dynamically allocate memory for a new node
+					i++;
+					link = (struct proxy*)malloc(sizeof(struct proxy));
+					link->line = (char*)malloc(strlen(token) + 1);
+					strcpy(link->line, token);
+					link->num = i;
+					link->next = NULL;
 
-				// Store the last partial line for processing when the next chunk is read
-				partial_read = true;
+					// If there is no head node, this node will become the head
+					if (pss->head == NULL)
+					{
+						pss->head = link;
+						pss->current = link;
+					}
+					// Otherwise join the end of the Linked List
+					else
+					{
+						pss->current->next = link;
+						pss->current = link;
+					}
+
+					// Store the last partial line for processing when the next chunk is read
+					partial_read = true;
+				}
 
 				// Read contents of the config file
-				file_ret = lws_vfs_file_read(fop_fd, &fop_len, buf, 100);
+				file_ret = lws_vfs_file_read(fop_fd, &fop_len, buf, 512);
 			}
 
 			// Close the config file
 			lws_vfs_file_close(&fop_fd);
+
+			// If no proxy servers were found
+			if (pss->head == NULL)
+			{
+				pss->nwa_back++;
+				pss->next_notification[pss->nwa_back%BUFFER_SIZE].nt = WARNING;
+				sprintf(pss->next_notification[pss->nwa_back%BUFFER_SIZE].message,
+						"Could not find any proxy servers within ProxyChains-ng "
+						"configuration file.");
+				pss->next_write_action[pss->nwa_back%BUFFER_SIZE] =
+						SEND_NOTIFICATION;
+				pss->nwa_cur++;
+				pss->stopping = true;
+			}
 
 			// If we are stopping, go to CLOSE state
 			if (pss->stopping)
@@ -1475,7 +1638,7 @@ void test_list(struct per_vhost_data__yi_hack_v3_test_proxy *vhd
 				pss->pid = 0;
 
 				// Send current progress
-				pss->progress = (3 * (pss->current->num - 1)) + pss->iteration + 1;
+				pss->progress = (3 * (pss->current->idx - 1)) + pss->iteration + 1;
 				pss->nwa_back++;
 				pss->next_write_action[pss->nwa_back%BUFFER_SIZE] = SEND_PROGRESS;
 				pss->nwa_cur++;
@@ -1493,7 +1656,7 @@ void test_list(struct per_vhost_data__yi_hack_v3_test_proxy *vhd
 				if (status == 0)
 				{
 					// Send current progress
-					pss->progress = (3 * pss->current->num) + 1;
+					pss->progress = (3 * pss->current->idx) + 1;
 					pss->nwa_back++;
 					pss->next_write_action[pss->nwa_back%BUFFER_SIZE] = SEND_PROGRESS;
 					pss->nwa_cur++;
@@ -1829,6 +1992,7 @@ int session_read(struct per_vhost_data__yi_hack_v3_test_proxy *vhd
 		, struct per_session_data__yi_hack_v3_test_proxy *pss, char *in, char *buf)
 {
 	char *token;
+	char *ptr;
 
 	// Split the incoming data by the newline
 	token = strtok((char *)in, "\n\0");
@@ -1870,11 +2034,71 @@ int session_read(struct per_vhost_data__yi_hack_v3_test_proxy *vhd
 		}
 		else if (strcmp(token, "DOWNLOAD_LIST") == 0)
 		{
+			token = strtok(NULL, "\n\0");
+
+			// If nothing is found after the split, return error
+			if (token == NULL)
+			{
+				return -1;
+			}
+
+			// If it has been requested to download and test all proxies, set flag
+			if (strcmp(token, "ALL") == 0)
+			{
+				pss->download_all = true;
+			}
+			else
+			{
+				// Convert string to long integer
+				pss->download_num = strtol(token, &ptr, 10);
+
+				// If the string is non-numeric...
+				if (*ptr != '\0')
+				{
+					pss->nwa_back++;
+					pss->next_notification[pss->nwa_back%BUFFER_SIZE].nt = WARNING;
+					pss->next_notification[pss->nwa_back%BUFFER_SIZE].code = errno;
+					sprintf(pss->next_notification[pss->nwa_back%BUFFER_SIZE].message,
+							"A numeric value greater than zero must be entered.", errno);
+					pss->next_write_action[pss->nwa_back%BUFFER_SIZE] =
+							SEND_NOTIFICATION;
+					pss->nwa_cur++;
+					lwsl_err(pss->next_notification[pss->nwa_back%BUFFER_SIZE].message);
+					return -1;
+				}
+				// If the number is a bad value...
+				else if (pss->download_num <= 0)
+				{
+					pss->nwa_back++;
+					pss->next_notification[pss->nwa_back%BUFFER_SIZE].nt = WARNING;
+					pss->next_notification[pss->nwa_back%BUFFER_SIZE].code = errno;
+					sprintf(pss->next_notification[pss->nwa_back%BUFFER_SIZE].message,
+							"A numeric value greater than zero must be entered.", errno);
+					pss->next_write_action[pss->nwa_back%BUFFER_SIZE] =
+							SEND_NOTIFICATION;
+					pss->nwa_cur++;
+					lwsl_err(pss->next_notification[pss->nwa_back%BUFFER_SIZE].message);
+					return -1;
+				}
+				else
+				{
+					pss->download_all = false;
+				}
+			}
+
 			pss->type = DOWNLOAD_LIST;
 		}
 		else if (strcmp(token, "TEST_STOP") == 0)
 		{
-			pss->stopping = true;
+			// If in idle state, there is nothing to do
+			if (pss->state != IDLE)
+			{
+				pss->stopping = true;
+			}
+			else
+			{
+				return -1;
+			}
 		}
 
 		pss->state = INIT;

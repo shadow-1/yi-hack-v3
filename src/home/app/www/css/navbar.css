@@ -24,3 +24,7 @@ html, body, form, .container {
 #PROXYCHAINSNG_log {
   height: 20%;
 }
+
+.button-wrapper .btn {
+  margin-bottom:5px;
+}

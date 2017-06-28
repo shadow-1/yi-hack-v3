@@ -11,7 +11,13 @@ Currently this project supports:
 
 ## Acknowledgments
 
-Special thanks to the following projects for their efforts on other Xiaomi cameras and giving inspiration for me to develop and publish my own custom firmware.
+Special thanks for [GearBest](www.gearbest.com) for generously donating a Yi Dome camera so I could further develop this firmware. Without having a camera to develop on, it would not have been possible to develop past the initial firmware releases.
+Consider having a look at the following special GearBest links:
+* [Yi 1080p Dome](http://www.gearbest.com/ip-cameras/pp_469365.html?wid=11&lkid=10912088 "GearBest Yi 1080p Dome")
+* [Yi Dome](http://www.gearbest.com/ip-cameras/pp_444029.html?wid=37&lkid=10912074 "GearBest Yi Dome")
+* [Yi Home](http://www.gearbest.com/ip-cameras/pp_341365.html?wid=11&lkid=10912107 "GearBest Yi Home")
+
+I would like to also thank the following projects for their efforts on other Xiaomi cameras and giving inspiration for me to develop and publish my own custom firmware.
 
 **fritz-smh** : https://github.com/fritz-smh/yi-hack
 
@@ -40,8 +46,8 @@ The supported cameras have the following features by default:
 * Wifi
 * Motion detection - a video file is generated if a motion have been detected in the last 60 seconds.
 * Send video/audio data through a cloud service to allow people to view camera data from their smartphone wherever they are.
-* Setup thanks to a smartphone app.
-* Local video storage on a microSD card.
+* Setup through smartphone app.
+* Local video storage on microSD card.
 
 This firmware includes:
 * Telnet server - _Enabled by default._
@@ -62,7 +68,7 @@ Performance is not degraded as the cameras video/audio feed is not routed throug
 
 2. Get an microSD card, preferably of capacity 16gb or less and format it by selecting File System as FAT32.
 
-**_Note: The microSD card must be formatted in FAT32. exFAT formatted microSD cards will not work._**
+**_IMPORTANT: The microSD card must be formatted in FAT32. exFAT formatted microSD cards will not work._**
 
 3. Get the correct firmware files for your camera from this link: https://github.com/shadow-1/yi-hack-v3/releases
 
@@ -84,7 +90,7 @@ Performance is not degraded as the cameras video/audio feed is not routed throug
 
 8. Configure the camera as normal by scanning the QR code on the smartphone. Ensure that your smartphone is connected to 2.4GHz wireless network.
 
-9. Blue light should come ON indicating that your Wifi connection has been successful.
+9. Blue light should come ON indicating that your WiFi connection has been successful.
 
 10. Although the WiFi connection on your camera has been successful but you won't be able to pair it with your phone yet until you perform the following steps.
 
@@ -97,29 +103,29 @@ Performance is not degraded as the cameras video/audio feed is not routed throug
 
 14. For those with the **International Version of the Camera**. ProxyChains-ng is not required. It can be disabled by going to "System Config", select "No" against Proxy-Chains-ng and clicking "Apply". No further configuration is required.
 
-15. For those with the **Chinese Version of the Camera**. Enter socks4 or socks5 proxy servers under [ProxyList] in the configuration. The proxy servers listed below are an example only. These might or might not be working. Find a working socks4 or socks5 proxy server and list it under [ProxyList] in the given syntax.
-```
-socks5 183.232.25.100 3080
-socks5 27.152.181.217 80
-socks5 125.67.236.195 8080
-socks4 115.29.192.194 1080
-```
+15. For those with the **Chinese Version of the Camera**. ProxyChains-ng is required to be configured. The quickest way to configure ProxyChains-ng is to utilise the Download Proxy List feature in the firmware.
 
-16. Click "Save"
+16. Click "Download Proxy List".
 
-17. Give it about 30-40 seconds and try to connect from your smartphone.
+17. Click "Download Proxies". By default, the firmware will download a list of proxy servers and choose 10 at random. Each proxy server is automatically tested to ensure that it is operational. Each operational proxy server located within Mainland China is selected to be saved automatically.
+![Alt text](download_proxy_list.png?raw=true "Download Proxy List")
 
-18. If it is not connecting, most likely reason is that the proxy entered is not working.
+18. Once the proxy server list has been generated and tested. Click "Save Selected Proxies". Every proxy server which has the check box next to it checked will be saved.
+![Alt text](download_proxy_list_completed_example.png?raw=true "Download Proxy List - Completed")
 
-19. If it gives you the alert "This camera can only be used in China", this means that the proxy that you entered in not based in Mainland China.
+19. Wait 30-40 seconds and try to connect from your smartphone.
 
 ## Which Smartphone App to use?
 ### Chinese Version of the Camera
 The Chinese version of the camera will **only** work with the Chinese version of the app.
 
-Android users, download the Chinese version of the Yi Home app and install the apk file manually. You can download the app from here under the directory 'Yi Home - Android': https://app.box.com/s/cibs7n1mgvhqaqjlidtveegu1uajt5yr
+Android users, download the Chinese version of the Yi Home app. It is available from the Mi Store.
+Link: http://app.mi.com/details?id=com.ants360.yicamera
+
+Alternatively, an APK file which can be installed manually is available from here under the directory 'Yi Home - Android': https://app.box.com/s/cibs7n1mgvhqaqjlidtveegu1uajt5yr
 
 iPhone users will need to change their App Store to the Chinese App Store and install Chinese version of the Yi Home app.
+Link: https://itunes.apple.com/cn/app/xiao-yi-zhi-neng-she-xiang-ji/id931168730
 
 ### International Version of the Camera
 The International version of the camera will **only** work with the International version of the app.

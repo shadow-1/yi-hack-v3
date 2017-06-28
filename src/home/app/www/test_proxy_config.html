@@ -118,8 +118,10 @@
 		<h4><strong>Log</strong></h4>
 		<pre class="pre-scrollable small" id="PROXYCHAINSNG_log" name="log"></pre>
 		<p>Service Provided by <a href="http://ipinfo.io">ipinfo.io</a>.</p>
-		<a class="btn btn-primary" href="proxy_config.html" role="button">Back</a>
-		<a class="btn btn-primary" href="test_proxy_config.html" role="button">Retry</a>
+		<div class="button-wrapper">
+			<a class="btn btn-primary" href="proxy_config.html" role="button">Back</a>
+			<a class="btn btn-primary" href="test_proxy_config.html" role="button">Retry</a>
+		</div>
 	</div>
 
 	<!-- Bootstrap core JavaScript
@@ -236,19 +238,19 @@ function init() {
 			} else if (jso.message == "SEND_INFO") {
 				var c;
 				if (parseInt(jso.return_value) == 0) {
-					c = '\u2714';
+					c = "<span class=\"label label-success\">\u2714</span>";
 				} else {
-					c = '\u2718';
+					c = "<span class=\"label label-danger\">\u2718</span>";
 				}
 				switch (parseInt(jso.iteration)) {
 					case 1:
-						document.getElementsByClassName("info_1")[0].textContent = c;
+						document.getElementsByClassName("info_1")[0].innerHTML = c;
 						break;
 					case 2:
-						document.getElementsByClassName("info_2")[0].textContent = c;
+						document.getElementsByClassName("info_2")[0].innerHTML = c;
 						break;
 					case 3:
-						document.getElementsByClassName("info_3")[0].textContent = c;
+						document.getElementsByClassName("info_3")[0].innerHTML = c;
 						break;
 				}
 				document.getElementsByClassName("ip")[0].textContent = jso.ip;
@@ -262,19 +264,19 @@ function init() {
 			} else if (jso.message == "SEND_PROXY_INFO") {
 				var c;
 				if (parseInt(jso.return_value) == 0) {
-					c = '\u2714';
+					c = "<span class=\"label label-success\">\u2714</span>";
 				} else {
-					c = '\u2718';
+					c = "<span class=\"label label-danger\">\u2718</span>";
 				}
 				switch (parseInt(jso.iteration)) {
 					case 1:
-						document.getElementsByClassName("proxy_info_1")[0].textContent = c;
+						document.getElementsByClassName("proxy_info_1")[0].innerHTML = c;
 						break;
 					case 2:
-						document.getElementsByClassName("proxy_info_2")[0].textContent = c;
+						document.getElementsByClassName("proxy_info_2")[0].innerHTML = c;
 						break;
 					case 3:
-						document.getElementsByClassName("proxy_info_3")[0].textContent = c;
+						document.getElementsByClassName("proxy_info_3")[0].innerHTML = c;
 						break;
 				}
 				document.getElementsByClassName("proxy_ip")[0].textContent = jso.ip;
