@@ -1,0 +1,33 @@
+# /etc/profile: system-wide .profile file for the Bourne shells
+#
+#
+ulimit -s 1024
+set_path_before()
+{
+	[ -d $1 ] && PATH="$1:$PATH"
+}
+
+PATH="/usr/bin:/usr/sbin:/bin:/sbin:/home/base/tools:/home/app/localbin:/home/base:/home/yi-hack-v3/bin"
+set_path_before /usr/local/sbin
+set_path_before /usr/local/bin
+
+LD_LIBRARY_PATH="/usr/local/lib:/usr/lib:/home/lib:/home/hisiko/hisilib:/home/app/locallib:/home/yi-hack-v3/lib"
+
+export PATH
+export LD_LIBRARY_PATH
+
+# ANSI COLORS
+CRE="[K"
+NORMAL="[0;39m"
+RED="[1;31m"
+GREEN="[1;32m"
+YELLOW="[1;33m"
+BLUE="[1;34m"
+MAGENTA="[1;35m"
+CYAN="[1;36m"
+WHITE="[1;37m"
+
+umask 022
+
+echo "${GREEN}Welcome to HiLinux.${NORMAL}"
+

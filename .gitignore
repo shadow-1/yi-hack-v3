@@ -4,8 +4,8 @@
 /src/libuv/*
 /src/libwebsockets/*
 /src/libwebsockets-plugins/*
-/src/home/app/lwsws/plugins/*
-/src/home/app/.hackinfo
+/src/home/yi-hack-v3/etc/lwsws/plugins/*
+/src/home/yi-hack-v3/.hackinfo
 /build/*
 !/src/busybox/.config
 !/src/proccgi/Makefile

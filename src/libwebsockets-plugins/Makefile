@@ -2,8 +2,8 @@ src = $(wildcard *.c)
 obj = $(src:.c=.o)
 
 CC = arm-hisiv300-linux-gcc
-CFLAGS = -march=armv5te -mcpu=arm926ej-s -I../libwebsockets/_install/home/app/include -I../libuv-1.11.0/_install/include
-LDFLAGS = -shared -L../libwebsockets/_install/home/app/lib -L../libuv-1.11.0/_install/lib -lwebsockets -luv
+CFLAGS = -march=armv5te -mcpu=arm926ej-s -I../libwebsockets/_install/home/yi-hack-v3/include -I../libuv-1.11.0/_install/include
+LDFLAGS = -shared -L../libwebsockets/_install/home/yi-hack-v3/lib -L../libuv-1.11.0/_install/lib -lwebsockets -luv
 #PREFIX = ./_install
 
 %.o: %.c

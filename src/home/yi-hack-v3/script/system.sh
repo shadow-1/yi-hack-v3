@@ -1,17 +1,17 @@
 #!/bin/sh
 
-CONF_FILE="/home/app/system.conf"
+CONF_FILE="/home/yi-hack-v3/etc/system.conf"
 
 get_config()
 {
-	key=$1
-	grep $1 $CONF_FILE | cut -d "=" -f2
+        key=$1
+        grep $1 $CONF_FILE | cut -d "=" -f2
 }
 
-if [ -f "/home/app/yi-hack-v3.7z" ]; then
-        7za x /home/app/yi-hack-v3.7z
-	rm /home/app/yi-hack-v3.7z
-fi
+export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:/home/lib:/home/yi-hack-v3/lib
+export PATH=$PATH:/home/base/tools:/home/yi-hack-v3/bin
+
+hostname -F /home/yi-hack-v3/etc/hostname
 
 if [[ $(get_config HTTPD) == "yes" ]] ; then
 	lwsws -D

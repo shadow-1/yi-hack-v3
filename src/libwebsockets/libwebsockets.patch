@@ -1,6 +1,6 @@
 diff -Naur '--exclude=.git' ./libwebsockets/lib/lejp-conf.c ./libwebsockets_yi-hack-v3/lib/lejp-conf.c
---- ./libwebsockets/lib/lejp-conf.c	2017-05-21 13:50:23.375017000 +0800
-+++ ./libwebsockets_yi-hack-v3/lib/lejp-conf.c	2017-05-21 13:55:51.559017000 +0800
+--- ./libwebsockets/lib/lejp-conf.c	2017-07-09 12:14:55.148043000 +0800
++++ ./libwebsockets_yi-hack-v3/lib/lejp-conf.c	2017-07-09 12:11:34.192043000 +0800
 @@ -33,7 +33,9 @@
  	"global.uid",
  	"global.gid",
@@ -170,7 +170,7 @@ diff -Naur '--exclude=.git' ./libwebsockets/lib/lejp-conf.c ./libwebsockets_yi-h
  	}
  
  	if (reason == LEJPCB_OBJECT_START &&
-@@ -429,12 +463,13 @@
+@@ -429,6 +463,7 @@
  		}
  		a->any_vhosts = 1;
  
@@ -178,13 +178,6 @@ diff -Naur '--exclude=.git' ./libwebsockets/lib/lejp-conf.c ./libwebsockets_yi-h
  		if (a->enable_client_ssl) {
  			const char *cert_filepath = a->info->client_ssl_cert_filepath;
  			const char *private_key_filepath = a->info->client_ssl_private_key_filepath;
- 			const char *ca_filepath = a->info->client_ssl_ca_filepath;
- 			const char *cipher_list = a->info->client_ssl_cipher_list;
--			memset(a->info, 0, sizeof(*a->info));
-+			memset(a->info, 0, sizeof(*a->info
- 			a->info->client_ssl_cert_filepath = cert_filepath;
- 			a->info->client_ssl_private_key_filepath = private_key_filepath;
- 			a->info->client_ssl_ca_filepath = ca_filepath;
 @@ -442,6 +477,7 @@
  			a->info->options = LWS_SERVER_OPTION_DO_SSL_GLOBAL_INIT;
  			lws_init_vhost_client_ssl(a->info, vhost);
@@ -282,8 +275,8 @@ diff -Naur '--exclude=.git' ./libwebsockets/lib/lejp-conf.c ./libwebsockets_yi-h
  	lws_snprintf(dd, sizeof(dd) - 1, "%s/conf", d);
  	if (lwsws_get_config(&a, dd, paths_vhosts,
 diff -Naur '--exclude=.git' ./libwebsockets/lwsws/main.c ./libwebsockets_yi-hack-v3/lwsws/main.c
---- ./libwebsockets/lwsws/main.c	2017-05-21 13:50:23.395017000 +0800
-+++ ./libwebsockets_yi-hack-v3/lwsws/main.c	2017-05-21 13:54:18.223017000 +0800
+--- ./libwebsockets/lwsws/main.c	2017-07-09 12:14:55.156043000 +0800
++++ ./libwebsockets_yi-hack-v3/lwsws/main.c	2017-07-09 12:14:05.164043000 +0800
 @@ -57,6 +57,7 @@
  
  #define LWSWS_CONFIG_STRING_SIZE (32 * 1024)
@@ -300,7 +293,7 @@ diff -Naur '--exclude=.git' ./libwebsockets/lwsws/main.c ./libwebsockets_yi-hack
  
  static const char * const plugin_dirs[] = {
 -	INSTALL_DATADIR"/libwebsockets-test-server/plugins/",
-+	"/home/app/lwsws/plugins/",
++	"/home/yi-hack-v3/etc/lwsws/plugins/",
  	NULL
  };
  
@@ -333,7 +326,7 @@ diff -Naur '--exclude=.git' ./libwebsockets/lwsws/main.c ./libwebsockets_yi-hack
 +#endif
  
 -	strcpy(config_dir, "/etc/lwsws");
-+	strcpy(config_dir, "/home/app/lwsws");
++	strcpy(config_dir, "/home/yi-hack-v3/etc/lwsws");
  	while (n >= 0) {
 -		n = getopt_long(argc, argv, "hd:c:", options, NULL);
 +		n = getopt_long(argc, argv, "hd:c:D", options, NULL);

@@ -1,6 +1,6 @@
 #!/bin/sh
 
-CONF_FILE="/home/app/system.conf"
+CONF_FILE="/home/yi-hack-v3/etc/system.conf"
 
 get_config()
 {
@@ -9,7 +9,7 @@ get_config()
 }
                 
 if [[ $(get_config PROXYCHAINSNG) == "yes" ]] ; then
-	proxychains4 ./cloudAPI_real "$@"
+	/home/yi-hack-v3/bin/proxychains4 ./cloudAPI_real "$@"
 else
 	./cloudAPI_real "$@"
 fi

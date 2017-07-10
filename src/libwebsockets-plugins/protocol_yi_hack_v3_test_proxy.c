@@ -16,7 +16,7 @@
 /**
  * Constants used in the plugin.
  */
-#define PROXYCHAINSNG_CONFIG_FILE "/home/app/proxychains.conf"
+#define PROXYCHAINSNG_CONFIG_FILE "/home/yi-hack-v3/etc/proxychains.conf"
 #define TEMP_PROXYCHAINSNG_CONFIG_FILE "/tmp/temp_proxychains.conf"
 #define TEMP_DOWNLOAD_FILE "/tmp/temp_proxy_list.txt"
 #define NOTIFICATION_MAX_LENGTH 200
@@ -280,6 +280,7 @@ struct per_session_data__yi_hack_v3_test_proxy
 
 	long download_num;
 	bool download_all;
+	bool download_only_socks;
 };
 
 struct per_vhost_data__yi_hack_v3_test_proxy *vhd;
@@ -355,6 +356,7 @@ void session_init(struct per_session_data__yi_hack_v3_test_proxy *pss)
 	pss->stopping = false;
 
 	pss->download_all = true;
+	pss->download_only_socks = false;
 }
 
 /**
@@ -670,6 +672,7 @@ void download_list(struct per_vhost_data__yi_hack_v3_test_proxy *vhd
 	int status;
 	bool partial_read;
 	int i;
+	bool process_proxy;
 
 	lws_fop_fd_t fop_fd;
 	lws_filepos_t fop_len;
@@ -870,9 +873,38 @@ void download_list(struct per_vhost_data__yi_hack_v3_test_proxy *vhd
 							strcpy(country, token);
 						}
 
-						// If a proxy server from Mainland China was read and the 
-						// proxy server is not HTTP (supports SSL connections)
-						if (strcmp(country, "cn") == 0 && strcmp(proxy, "http") != 0)
+						if (pss->download_only_socks)
+						{
+							// If a proxy server from Mainland China was read and the 
+							// proxy server is socks4 or socks5
+							if (strcmp(country, "cn") == 0 && 
+									(strcmp(proxy, "socks4") == 0 ||
+									strcmp(proxy, "socks5") == 0))
+							{
+								process_proxy = true;
+							}
+							else
+							{
+								process_proxy = false;
+							}
+						}
+						else
+						{
+							// If a proxy server from Mainland China was read and the 
+							// proxy server is not HTTP (supports SSL connections)
+							if (strcmp(country, "cn") == 0 &&
+									strcmp(proxy, "http") != 0)
+							{
+								process_proxy = true;
+							}
+							else
+							{
+								process_proxy = false;
+							}
+						}
+
+						// Process proxy server if criteria has passed
+						if (process_proxy)
 						{
 							// Update HTTPS proxy type to HTTP which is required
 							// in ProxyChains-ng configuration file syntax
@@ -964,9 +996,38 @@ void download_list(struct per_vhost_data__yi_hack_v3_test_proxy *vhd
 						strcpy(country, token);
 					}
 
-					// If a proxy server from Mainland China was read and the 
-					// proxy server is not HTTP (supports SSL connections)
-					if (strcmp(country, "cn") == 0 && strcmp(proxy, "http") != 0)
+					if (pss->download_only_socks)
+					{
+						// If a proxy server from Mainland China was read and the 
+						// proxy server is socks4 or socks5
+						if (strcmp(country, "cn") == 0 && 
+								(strcmp(proxy, "socks4") == 0 ||
+								strcmp(proxy, "socks5") == 0))
+						{
+							process_proxy = true;
+						}
+						else
+						{
+							process_proxy = false;
+						}
+					}
+					else
+					{
+						// If a proxy server from Mainland China was read and the 
+						// proxy server is not HTTP (supports SSL connections)
+						if (strcmp(country, "cn") == 0 &&
+								strcmp(proxy, "http") != 0)
+						{
+							process_proxy = true;
+						}
+						else
+						{
+							process_proxy = false;
+						}
+					}
+
+					// Process proxy server if criteria has passed
+					if (process_proxy)
 					{
 						// Update HTTPS proxy type to HTTP which is required
 						// in ProxyChains-ng configuration file syntax
@@ -1683,7 +1744,6 @@ void test_list(struct per_vhost_data__yi_hack_v3_test_proxy *vhd
 					pss->current = pss->current->next;
 					pss->state = PREP_TEMP_CONFIG_FILE;
 				}
-				// Otherwise send error message and abort
 				else
 				{
 					// If we are stopping, go to CLOSE state
@@ -2034,6 +2094,24 @@ int session_read(struct per_vhost_data__yi_hack_v3_test_proxy *vhd
 		}
 		else if (strcmp(token, "DOWNLOAD_LIST") == 0)
 		{
+			token = strtok(NULL, "\n\0");
+
+			// If nothing is found after the split, return error
+			if (token == NULL)
+			{
+				return -1;
+			}
+			
+			// If it has been requested to download and test all proxies, set flag
+			if (strcmp(token, "SOCKS") == 0)
+			{
+				pss->download_only_socks = true;
+			}
+			else
+			{
+				pss->download_only_socks = false;
+			}
+			
 			token = strtok(NULL, "\n\0");
 
 			// If nothing is found after the split, return error

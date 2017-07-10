@@ -5,7 +5,7 @@
      "access-log": "/tmp/yi-hack-v3_lwsws-log",
      "mounts": [{
        "mountpoint": "/",
-       "origin": "file:///home/app/www",
+       "origin": "file:///home/yi-hack-v3/www",
        "default": "index.html",
 #       "cache-max-age": "60",
 #       "cache-reuse": "1",

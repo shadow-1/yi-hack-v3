@@ -1,0 +1,10 @@
+#!/bin/sh
+
+ARCHIVE_FILE="/home/yi-hack-v3/yi-hack-v3.7z"
+
+if [ -f $ARCHIVE_FILE ]; then
+        7za x $ARCHIVE_FILE
+        rm $ARCHIVE_FILE
+fi
+
+/home/yi-hack-v3/script/system.sh

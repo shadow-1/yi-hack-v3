@@ -10,10 +10,11 @@
 /**
  * Constants used in the plugin.
  */
-#define HACK_INFO_FILE "/home/app/.hackinfo"
+#define HACK_INFO_FILE "/home/yi-hack-v3/.hackinfo"
 #define BASE_VERSION_FILE "/home/homever"
-#define HACK_CONFIG_FILE "/home/app/system.conf"
-#define PROXYCHAINSNG_CONFIG_FILE "/home/app/proxychains.conf"
+#define HACK_CONFIG_FILE "/home/yi-hack-v3/etc/system.conf"
+#define PROXYCHAINSNG_CONFIG_FILE "/home/yi-hack-v3/etc/proxychains.conf"
+#define HOSTNAME "/home/yi-hack-v3/etc/hostname"
 #define NOTIFICATION_MAX_LENGTH 200
 #define BUFFER_SIZE 10
 #define CHUNK_SIZE 200
@@ -83,6 +84,7 @@ struct per_vhost_data__yi_hack_v3_info
 	unsigned char camera[32];
 	unsigned char hack_version[32];
 	unsigned char base_version[32];
+	unsigned char hostname[32];
 };
 
 /**
@@ -198,6 +200,36 @@ int protocol_init(struct per_vhost_data__yi_hack_v3_info *vhd, char *buf)
 	// Close the base version file
 	lws_vfs_file_close(&fop_fd);
 	
+	// Open the hostname file
+	fop_fd = lws_vfs_file_open(vhd->fops_plat, HOSTNAME, &flags);
+
+	if (!fop_fd)
+	{
+		lwsl_err("ERROR (%d): Failed to open file - %s.\n", errno, HOSTNAME);
+		return -1;
+	}	
+
+	// Read the hostname file
+	file_ret = lws_vfs_file_read(fop_fd, &fop_len, buf, 512);
+
+	if (file_ret < 0)
+	{
+		lwsl_err("ERROR (%d): Failed to read file - %s.\n", errno, HOSTNAME);
+		return -1;
+	}
+
+	buf[fop_len] = '\0';
+
+	// Read the hostname
+	token = strtok(buf, "\n\0");
+	if (token != NULL)
+	{
+		strcpy(vhd->hostname, token);
+	}
+
+	// Close the hostname file
+	lws_vfs_file_close(&fop_fd);
+	
 	return 0;
 }
 
@@ -244,8 +276,9 @@ int session_write(struct lws *wsi, struct per_vhost_data__yi_hack_v3_info *vhd,
 		case SEND_CAM_INFO:
 			// Prepare to send data in JSON format
 			n = sprintf((char *)buf, "{\n\"message\":\"SEND_CAM_INFO\",\n\"camera\":"
-					"\"%s\",\n\"base_version\":\"%s\",\n\"hack_version\":\"%s\"\n}"
-					,vhd->camera, vhd->base_version, vhd->hack_version);
+					"\"%s\",\n\"base_version\":\"%s\",\n\"hack_version\":\"%s\",\n"
+					"\"hostname\":\"%s\"\n}"
+					,vhd->camera, vhd->base_version, vhd->hack_version, vhd->hostname);
 
 			// Send the data
 			m = lws_write(wsi, buf, n, LWS_WRITE_TEXT);
@@ -605,6 +638,30 @@ int session_read(struct per_vhost_data__yi_hack_v3_info *vhd,
 						strcpy(pss->ftpd_enabled, token);
 				}
 			}
+			// If the hostname is being read
+			else if (strcmp(token,"hostname") == 0)
+			{
+				// Read the value that is after the '=' character
+				token = strtok(NULL, "\n");
+				if (token != NULL)
+				{
+					if (strlen(token) < 32)
+					{
+						strcpy(vhd->hostname, token);
+					}
+					else
+					{
+						pss->nwa_back++;
+						pss->next_notification[pss->nwa_back%BUFFER_SIZE].nt = WARNING;
+						sprintf(pss->next_notification[pss->nwa_back%BUFFER_SIZE].message,
+								"Hostname has to be less than 32 characters long. "
+								"Hostname not saved.");
+						pss->next_write_action[pss->nwa_back%BUFFER_SIZE] =
+								SEND_NOTIFICATION;
+						pss->nwa_cur++;
+					}
+				}
+			}
 			// Split config file by following '=' or '\n' (on the next line)
 			token = strtok(NULL, "=\n");
 		}
@@ -662,6 +719,59 @@ int session_read(struct per_vhost_data__yi_hack_v3_info *vhd,
 		}
 
 		// Close config file
+		lws_vfs_file_close(&fop_fd);
+
+		// Open hostname file for writing, replacing the file if it exists
+		flags = O_WRONLY | O_TRUNC;
+		fop_fd = lws_vfs_file_open(vhd->fops_plat, HOSTNAME, &flags);
+
+		if (!fop_fd)
+		{
+			pss->nwa_back++;
+			pss->next_notification[pss->nwa_back%BUFFER_SIZE].nt = ERROR;
+			pss->next_notification[pss->nwa_back%BUFFER_SIZE].code = errno;
+			sprintf(pss->next_notification[pss->nwa_back%BUFFER_SIZE].message,
+					"ERROR (%d): Failed to open file - %s.\n", errno, HOSTNAME);
+			pss->next_write_action[pss->nwa_back%BUFFER_SIZE] = SEND_NOTIFICATION;
+			pss->nwa_cur++;
+			lwsl_err(pss->next_notification[pss->nwa_back%BUFFER_SIZE].message);
+			return -1;
+		}
+
+		// Prepare to save hostname file
+		n = sprintf((char *)buf, "%s", vhd->hostname);
+
+		if (n != strlen(buf))
+		{
+			pss->nwa_back++;
+			pss->next_notification[pss->nwa_back%BUFFER_SIZE].nt = ERROR;
+			pss->next_notification[pss->nwa_back%BUFFER_SIZE].code = errno;
+			sprintf(pss->next_notification[pss->nwa_back%BUFFER_SIZE].message,
+					"ERROR (%d): Failed to prepare writing to file - %s.\n", errno
+					, HOSTNAME);
+			pss->next_write_action[pss->nwa_back%BUFFER_SIZE] = SEND_NOTIFICATION;
+			pss->nwa_cur++;
+			lwsl_err(pss->next_notification[pss->nwa_back%BUFFER_SIZE].message);
+			return -1;
+		}
+
+		// Write config file
+		file_ret = lws_vfs_file_write(fop_fd, &fop_len, buf, n);
+
+		if (file_ret < 0)
+		{
+			pss->nwa_back++;
+			pss->next_notification[pss->nwa_back%BUFFER_SIZE].nt = ERROR;
+			pss->next_notification[pss->nwa_back%BUFFER_SIZE].code = errno;
+			sprintf(pss->next_notification[pss->nwa_back%BUFFER_SIZE].message,
+					"ERROR (%d): Failed to write file - %s.\n", errno, HOSTNAME);
+			pss->next_write_action[pss->nwa_back%BUFFER_SIZE] = SEND_NOTIFICATION;
+			pss->nwa_cur++;
+			lwsl_err(pss->next_notification[pss->nwa_back%BUFFER_SIZE].message);
+			return -1;
+		}
+
+		// Close hostname file
 		lws_vfs_file_close(&fop_fd);
 		
 		pss->nwa_back++;

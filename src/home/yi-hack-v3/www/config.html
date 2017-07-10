@@ -93,6 +93,11 @@
 			</label>
 		</div>
 
+		<div class="form-group form-inline">
+			<label class="col-sm-3 control-label">Hostname</label>
+			<input type="text" class="form-control" id="hostname_text">
+		</div>
+
 		<div class="button-wrapper">
 			<input class="btn btn-primary" id="apply" type="submit" value="Apply">
 		</div>
@@ -162,6 +167,7 @@ function get_appropriate_ws_url()
 				document.title = jso.camera;
 				
 				document.getElementsByClassName("camera")[0].textContent = jso.camera;
+				document.getElementById("hostname_text").value = jso.hostname;
 			} else if (jso.message == "SEND_CONFIG") {
 				if (jso.proxychainsng_enabled == "yes") {
 					document.getElementById("PROXYCHAINSNG_yes").checked = true;
@@ -218,6 +224,7 @@ function get_appropriate_ws_url()
 function init() {
 	socket_info.send("SEND_CAM_INFO\n");
 	socket_info.send("SEND_CONFIG\n");
+	socket_info.send("SEND_HOSTNAME\n");
 }
 
 function apply() {
@@ -251,7 +258,7 @@ function apply() {
 		ftpd_enabled = "no";
 	}
 	
-	message = "SAVE_CONFIG\nproxychainsng_enabled=" + proxychainsng_enabled + "\nhttpd_enabled=" + httpd_enabled + "\ntelnetd_enabled=" + telnetd_enabled + "\nftpd_enabled=" + ftpd_enabled;
+	message = "SAVE_CONFIG\nproxychainsng_enabled=" + proxychainsng_enabled + "\nhttpd_enabled=" + httpd_enabled + "\ntelnetd_enabled=" + telnetd_enabled + "\nftpd_enabled=" + ftpd_enabled + "\nhostname=" + document.getElementById("hostname_text").value;
 
 	socket_info.send(message);
 }
@@ -266,3 +273,4 @@ function remove_information(x) {
 </body>
 
 </html>
+

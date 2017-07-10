@@ -88,7 +88,9 @@
 						<span class="caret"></span>
 					</button>
 					<ul class="dropdown-menu">
+						<li><a id="download_num_socks">Download SOCKS Proxies</a></li>
 						<li><a id="download_all">Download All Proxies</a></li>
+						<li><a id="download_all_socks">Download All SOCKS Proxies</a></li>
 					</ul>
 				</div>
 				<div>
@@ -108,8 +110,10 @@
 	<script src="/js/ie10-viewport-bug-workaround.js"></script>
 
 <script>
-document.getElementById('download_num').onclick = download_num;
-document.getElementById('download_all').onclick = download_all;
+document.getElementById('download_num_socks').onclick = function(){download_num("SOCKS")};
+document.getElementById('download_num').onclick = function(){download_num("ALL_PROXY")};
+document.getElementById('download_all_socks').onclick = function(){download_all("SOCKS")};
+document.getElementById('download_all').onclick = function(){download_all("ALL_PROXY")};
 document.getElementById('stop').onclick = stop;
 document.getElementById('save_proxy_list').onclick = save_proxy_list;
 var info_num;
@@ -341,7 +345,7 @@ function isPositiveInteger(n) {
     return /^\+?\d+$/.test(n);
 }
 
-function init_test_proxy(x) {
+function init_test_proxy(type, num) {
 	var element = document.getElementById("validation_error");
 
 	if (element) {
@@ -359,7 +363,7 @@ function init_test_proxy(x) {
 	document.getElementById("proxy_num").disabled = true;
 	document.getElementById("carat").disabled = true;
 	document.getElementById("PROXYCHAINSNG_log").value = "";
-	socket_test_proxy.send("DOWNLOAD_LIST\n" + x + "\n");
+	socket_test_proxy.send("DOWNLOAD_LIST\n" + type + "\n" + num + "\n");
 }
 
 function stop() {
@@ -367,15 +371,15 @@ function stop() {
 	document.getElementById("stop").disabled = true;
 }
 
-function download_all() {
-	init_test_proxy("ALL");
+function download_all(type) {
+	init_test_proxy(type, "ALL");
 }
 
-function download_num() {
+function download_num(type) {
 	var value = document.getElementById("proxy_num").value;
 
 	if (isPositiveInteger(value)) {
-		init_test_proxy(value);
+		init_test_proxy(type, value);
 	} else {
 		var element = document.getElementById("validation_error");
 

@@ -74,9 +74,11 @@ Performance is not degraded as the cameras video/audio feed is not routed throug
 
 | Camera | rootfs partition | home partition | Remarks |
 | --- | --- | --- | --- |
-| **Yi 1080p Dome** | rootfs_h20 | home_h20 | Firmware files required for the Yi 1080p Dome camera. |
+| **Yi Home** | - | - | Not yet supported. |
+| **Yi Home 17CN** | rootfs_y18 | home_y18 | Firmware files required for the Yi Home 17CN camera. |
 | **Yi 1080p Home** | rootfs_y20 | home_y20 | Firmware files required for the Yi 1080p Home camera. |
 | **Yi Dome** | rootfs_v201 | home_v201 | Firmware files required for the Yi Dome camera. |
+| **Yi 1080p Dome** | rootfs_h20 | home_h20 | Firmware files required for the Yi 1080p Dome camera. |
 
 4. Save both files on root path of microSD card.
 
@@ -94,26 +96,28 @@ Performance is not degraded as the cameras video/audio feed is not routed throug
 
 10. Although the WiFi connection on your camera has been successful but you won't be able to pair it with your phone yet until you perform the following steps.
 
-11. Find the IP address has been assigned to your camera. This can be found on most routers. Alternatively you can install an app on your phone to scan your wifi network. Android users can install "Network Scanner" and run it to find the IP address of the camera. e.g. 192.168.1.5. The camera should be listed as “Shenzhen Zowee Technology Co. Ltd”.
+11. Go in the browser and access the web interface of the camera as a website. By default, the hostname of the camera is `yi-hack-v3`. Access the web interface by entering the following in your web browser: http://yi-hack-v3 
 
-12. Go in the browser and open it as a website e.g. http://192.168.1.5
+Depending upon your network setup, accessing the web interface with the hostname may not work. In this case, the IP address of the camera has to be found. This can be found on most routers. Alternatively you can install an app on your phone to scan your wifi network. Android users can install "Network Scanner" and run it to find the IP address of the camera. e.g. 192.168.1.5. The camera should be listed as “Shenzhen Zowee Technology Co. Ltd”. Access the web interface by entering the IP address of the came in a web browser. e.g. http://192.168.1.5
 
-13. It will open a configuration page of the camera.
+**_IMPORTANT: If you have multiple cameras. It is important to configure each camera with a unique hostname. Otherwise the web interface will only be accessible by IP address. The hostname can be configured from the web interface of the camera on the "System Config" page._**
+
+12. It will open a configuration page of the camera.
 ![Alt text](web_interface.png?raw=true "Web Interface")
 
-14. For those with the **International Version of the Camera**. ProxyChains-ng is not required. It can be disabled by going to "System Config", select "No" against Proxy-Chains-ng and clicking "Apply". No further configuration is required.
+13. For those with the **International Version of the Camera**. ProxyChains-ng is not required. It can be disabled by going to "System Config", select "No" against Proxy-Chains-ng and clicking "Apply". No further configuration is required.
 
-15. For those with the **Chinese Version of the Camera**. ProxyChains-ng is required to be configured. The quickest way to configure ProxyChains-ng is to utilise the Download Proxy List feature in the firmware.
+14. For those with the **Chinese Version of the Camera**. ProxyChains-ng is required to be configured. The quickest way to configure ProxyChains-ng is to utilise the Download Proxy List feature in the firmware.
 
-16. Click "Download Proxy List".
+15. Click "Download Proxy List".
 
-17. Click "Download Proxies". By default, the firmware will download a list of proxy servers and choose 10 at random. Each proxy server is automatically tested to ensure that it is operational. Each operational proxy server located within Mainland China is selected to be saved automatically.
+16. Click "Download Proxies". By default, the firmware will download a list of proxy servers and choose 10 at random. Each proxy server is automatically tested to ensure that it is operational. Each operational proxy server located within Mainland China is selected to be saved automatically.
 ![Alt text](download_proxy_list.png?raw=true "Download Proxy List")
 
-18. Once the proxy server list has been generated and tested. Click "Save Selected Proxies". Every proxy server which has the check box next to it checked will be saved.
+17. Once the proxy server list has been generated and tested. Click "Save Selected Proxies". Every proxy server which has the check box next to it checked will be saved.
 ![Alt text](download_proxy_list_completed_example.png?raw=true "Download Proxy List - Completed")
 
-19. Wait 30-40 seconds and try to connect from your smartphone.
+18. Wait 30-40 seconds and try to connect from your smartphone.
 
 ## Which Smartphone App to use?
 ### Chinese Version of the Camera
@@ -159,9 +163,11 @@ Recovery images have been created to go back to stock firmware. You can download
 
 | Camera | rootfs partition | home partition | Remarks |
 | --- | --- | --- | --- |
-| **Yi 1080p Dome** | rootfs_h20 | home_h20 | Stock firmware is version 1.9.2.0C_201611011902. |
+| **Yi Home 17CN** | rootfs_y18 | home_y18 | Stock firmware is version 1.8.7.0C_201705091058. |
 | **Yi 1080p Home** | rootfs_y20 | home_y20 | Stock firmware is version 2.0.0.1A_201612051401. |
 | **Yi Dome** | rootfs_v201 | home_v201 | Stock firmware is version 1.9.1.0F_201701041701. |
+| **Yi 1080p Dome** | rootfs_h20 | home_h20 | Stock firmware is version 1.9.2.0C_201611011902. |
 
 ## Development
 **TODO**
+
