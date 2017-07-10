@@ -3,9 +3,10 @@
 This project is a collection of config files, Makefiles and scripts to allow custom firmware images to be created and deployed to extend the functionality of Xiaomi Cameras based on HiSilicon Hi3518e V200 chipset.
 
 Currently this project supports:
-* Yi 1080p Dome
+* Yi Home 17CN
 * Yi 1080p Home
 * Yi Dome
+* Yi 1080p Dome
 
 ![Alt text](yi-cam.png?raw=true "Supported Yi Cameras")
 
@@ -62,9 +63,10 @@ Performance is not degraded as the cameras video/audio feed is not routed throug
 
 ## Getting Started - Step by Step Guide
 1. Check that you have a correct Xiaomi Yi camera. Currently 3 cameras are supported: 
-* Yi 1080p Dome Camera
+* Yi Home 17CN Camera
 * Yi 1080p Home Camera
 * Yi Dome Camera
+* Yi 1080p Dome Camera
 
 2. Get an microSD card, preferably of capacity 16gb or less and format it by selecting File System as FAT32.
 
