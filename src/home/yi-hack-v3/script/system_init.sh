@@ -12,7 +12,7 @@ if [ -f $ARCHIVE_FILE ]; then
 	rm $ARCHIVE_FILE
 fi
 
-if [ -f /home/app/cloudAPI_real ]; then
+if [ ! -f /home/app/cloudAPI_real ]; then
 	mv /home/app/cloudAPI /home/app/cloudAPI_real
 	cp /home/yi-hack-v3/cloudAPI /home/app/
 	rm $DHCP_SCRIPT_DEST
