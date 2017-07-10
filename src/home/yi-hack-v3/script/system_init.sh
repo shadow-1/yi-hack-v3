@@ -1,16 +1,14 @@
 #!/bin/sh
 
 ARCHIVE_FILE="/home/yi-hack-v3/yi-hack-v3.7z"
+DESTDIR="/home/yi-hack-v3"
 UDHCPC_SCRIPT_DEST="/home/app/script/default.script"
 DHCP_SCRIPT_DEST="/home/app/script/wifidhcp.sh"
 UDHCP_SCRIPT="/home/yi-hack-v3/default.script"
 DHCP_SCRIPT="/home/yi-hack-v3/wifidhcp.sh"
 
-export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:/home/yi-hack-v3/lib
-export PATH=$PATH:/home/yi-hack-v3/bin
-
 if [ -f $ARCHIVE_FILE ]; then
-	7za x $ARCHIVE_FILE
+	/home/base/tools/7za x $ARCHIVE_FILE -o$DESTDIR
 	rm $ARCHIVE_FILE
 fi
 
