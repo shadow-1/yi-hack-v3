@@ -73,6 +73,52 @@ char* args_get_proxy_info_temp[] =
 };
 
 /**
+ * Command to run to test connectivity with the Xiaomi server.
+ */
+char* args_connectivity[] =
+{
+	"wget",
+	"-O-",
+	"-q",
+	"-T",
+	"8",
+	"https://api.xiaoyi.com",
+	NULL
+};
+
+/**
+ * Command to run to test ProxyChains-ng configuration with the Xiaomi server.
+ */
+char* args_proxy_connectivity[] =
+{
+	"proxychains4",
+	"wget",
+	"-O-",
+	"-q",
+	"-T",
+	"8",
+	"https://api.xiaoyi.com",
+	NULL
+};
+
+/**
+ * Command to run to test temporary ProxyChains-ng configuration with the Xiaomi server.
+ */
+char* args_proxy_temp_connectivity[] =
+{
+	"proxychains4",
+	"-f",
+	TEMP_PROXYCHAINSNG_CONFIG_FILE,
+	"wget",
+	"-O-",
+	"-q",
+	"-T",
+	"8",
+	"https://api.xiaoyi.com",
+	NULL
+};
+
+/**
  * Command to run to download proxy file.
  */
 char* args_download_list[] =
@@ -131,7 +177,9 @@ enum proxy_enum
 enum lws_write_action
 {
 	SEND_INFO,
+	SEND_CONNECT,
 	SEND_PROXY_INFO,
+	SEND_PROXY_CONNECT,
 	SEND_LOG,
 	SEND_NOTIFICATION,
 	SEND_PROGRESS,
@@ -180,7 +228,9 @@ enum test_proxy_state
 	PARSE_FILE,
 	PREP_TEMP_CONFIG_FILE,
 	GET_INFO,
+	GET_CONNECTIVITY,
 	GET_PROXY_INFO,
+	GET_PROXY_CONNECTIVITY,
 	CLOSE
 };
 
@@ -1127,7 +1177,7 @@ void download_list(struct per_vhost_data__yi_hack_v3_test_proxy *vhd
 			// and move onto the next step
 			else
 			{
-				pss->progress_num = (3 * pss->download_num) + 2;
+				pss->progress_num = (6 * pss->download_num) + 2;
 
 				pss->nwa_back++;
 				pss->next_write_action[pss->nwa_back%BUFFER_SIZE] = SEND_PROGRESS;
@@ -1259,7 +1309,7 @@ void download_list(struct per_vhost_data__yi_hack_v3_test_proxy *vhd
 				pss->pid = 0;
 
 				// Send current progress
-				pss->progress = (3 * (pss->current->idx - 1)) + pss->iteration + 1;
+				pss->progress = (6 * (pss->current->idx - 1)) + pss->iteration + 1;
 				pss->nwa_back++;
 				pss->next_write_action[pss->nwa_back%BUFFER_SIZE] = SEND_PROGRESS;
 				pss->nwa_cur++;
@@ -1277,7 +1327,8 @@ void download_list(struct per_vhost_data__yi_hack_v3_test_proxy *vhd
 				if (status == 0)
 				{
 					// Send current progress
-					pss->progress = (3 * pss->current->idx) + 1;
+					//pss->progress = (6 * pss->current->idx) + 1;
+					pss->progress = (6 * (pss->current->idx - 1)) + 4;
 					pss->nwa_back++;
 					pss->next_write_action[pss->nwa_back%BUFFER_SIZE] = SEND_PROGRESS;
 					pss->nwa_cur++;
@@ -1298,8 +1349,124 @@ void download_list(struct per_vhost_data__yi_hack_v3_test_proxy *vhd
 						pss->next_write_action[pss->nwa_back%BUFFER_SIZE] =
 								SEND_NOTIFICATION;
 						pss->nwa_cur++;
-					}
 
+						// Move to next proxy server in list
+						pss->iteration = 1;
+						pss->current = pss->current->next;
+						pss->state = PREP_TEMP_CONFIG_FILE;
+					}
+					else
+					{
+						// Move to next step
+						pss->iteration = 1;
+						pss->state = GET_PROXY_CONNECTIVITY;
+					}
+				}
+				// Otherwise send error message and abort
+				else
+				{
+					// If we are stopping, go to CLOSE state
+					if (pss->stopping)
+					{
+						pss->state = CLOSE;
+					}
+					else
+					{
+						// If the process failed, retry
+						if (pss->iteration < NUM_RETRY)
+						{
+							pss->iteration++;
+						}
+						// Otherwise move onto next proxy server
+						else
+						{
+							// Send current progress
+							pss->progress = (6 * pss->current->idx) + 1;
+							pss->nwa_back++;
+							pss->next_write_action[pss->nwa_back%BUFFER_SIZE] = SEND_PROGRESS;
+							pss->nwa_cur++;
+
+							pss->iteration = 1;
+							pss->current = pss->current->next;
+							pss->state = PREP_TEMP_CONFIG_FILE;
+						}
+					}
+				}
+			}
+
+			break;
+
+		case GET_PROXY_CONNECTIVITY:
+			// If we are stopping, kill the current child process
+			// if one has been executed
+			if (pss->stopping)
+			{
+				if (pss->pid != 0)
+				{
+					kill(pss->pid, SIGKILL);
+				}
+			}
+
+			// Execute child process
+			//lejp_construct(&pss->ctx, test_proxy_cb, pss, proxy_json
+			//		, ARRAY_SIZE(proxy_json));
+			rv = execute_process(pss->infd, pss->outfd, pss->errfd, &pss->pid
+					, args_proxy_temp_connectivity, &status, pss);
+
+			if (rv < 0)
+			{
+				pss->nwa_back++;
+				pss->next_notification[pss->nwa_back%BUFFER_SIZE].nt = ERROR;
+				pss->next_notification[pss->nwa_back%BUFFER_SIZE].code = errno;
+				sprintf(pss->next_notification[pss->nwa_back%BUFFER_SIZE].message,
+						"ERROR (%d): Could not start external process.\n", errno);
+				pss->next_write_action[pss->nwa_back%BUFFER_SIZE] = SEND_NOTIFICATION;
+				pss->nwa_cur++;
+				lwsl_err(pss->next_notification[pss->nwa_back%BUFFER_SIZE].message);
+				pss->state = CLOSE;
+				return;
+			}
+			else if (rv == 0)
+			{
+				// Process has not finished (callback needs to be called again)
+			}
+			else
+			{
+				// Process finished, cleanup and move onto next step
+				//lejp_destruct(&pss->ctx);
+				pss->outfd[0] = 0;
+				pss->outfd[1] = 0;
+				pss->infd[0] = 0;
+				pss->infd[1] = 0;
+				pss->errfd[0] = 0;
+				pss->errfd[1] = 0;
+				pss->pid = 0;
+
+				// Send current progress
+				pss->progress = (6 * (pss->current->idx - 1)) + pss->iteration + 4;
+				pss->nwa_back++;
+				pss->next_write_action[pss->nwa_back%BUFFER_SIZE] = SEND_PROGRESS;
+				pss->nwa_cur++;
+
+				// Get return value, interation and send through WebSocket connection
+				pss->test_information.index = pss->current->num;
+				pss->test_information.return_value = WEXITSTATUS(status);
+				pss->test_information.iteration = pss->iteration;
+
+				pss->nwa_back++;
+				pss->next_write_action[pss->nwa_back%BUFFER_SIZE] = SEND_PROXY_CONNECT;
+				pss->nwa_cur++;
+
+				// If process completed successfully, move onto the next proxy server
+				if (status == 0)
+				{
+					// Send current progress
+					pss->progress = (6 * pss->current->idx) + 1;
+					pss->nwa_back++;
+					pss->next_write_action[pss->nwa_back%BUFFER_SIZE] = SEND_PROGRESS;
+					pss->nwa_cur++;
+
+					// Move onto next proxy server
 					pss->iteration = 1;
 					pss->current = pss->current->next;
 					pss->state = PREP_TEMP_CONFIG_FILE;
@@ -1515,6 +1682,7 @@ void test_list(struct per_vhost_data__yi_hack_v3_test_proxy *vhd
 					link = (struct proxy*)malloc(sizeof(struct proxy));
 					link->line = (char*)malloc(strlen(token) + 1);
 					strcpy(link->line, token);
+					link->idx = i;
 					link->num = i;
 					link->next = NULL;
 
@@ -1565,7 +1733,7 @@ void test_list(struct per_vhost_data__yi_hack_v3_test_proxy *vhd
 			// and move onto the next step
 			else
 			{
-				pss->progress_num = (3 * pss->current->num) + 2;
+				pss->progress_num = (6 * pss->current->num) + 2;
 
 				pss->nwa_back++;
 				pss->next_write_action[pss->nwa_back%BUFFER_SIZE] = SEND_PROGRESS;
@@ -1699,7 +1867,7 @@ void test_list(struct per_vhost_data__yi_hack_v3_test_proxy *vhd
 				pss->pid = 0;
 
 				// Send current progress
-				pss->progress = (3 * (pss->current->idx - 1)) + pss->iteration + 1;
+				pss->progress = (6 * (pss->current->idx - 1)) + pss->iteration + 1;
 				pss->nwa_back++;
 				pss->next_write_action[pss->nwa_back%BUFFER_SIZE] = SEND_PROGRESS;
 				pss->nwa_cur++;
@@ -1717,7 +1885,8 @@ void test_list(struct per_vhost_data__yi_hack_v3_test_proxy *vhd
 				if (status == 0)
 				{
 					// Send current progress
-					pss->progress = (3 * pss->current->idx) + 1;
+					//pss->progress = (3 * pss->current->idx) + 1;
+					pss->progress = (6 * (pss->current->idx - 1)) + 4;
 					pss->nwa_back++;
 					pss->next_write_action[pss->nwa_back%BUFFER_SIZE] = SEND_PROGRESS;
 					pss->nwa_cur++;
@@ -1740,10 +1909,116 @@ void test_list(struct per_vhost_data__yi_hack_v3_test_proxy *vhd
 						pss->nwa_cur++;
 					}
 
+					// Move to next step
+					pss->iteration = 1;
+					pss->state = GET_PROXY_CONNECTIVITY;
+				}
+				else
+				{
+					// If we are stopping, go to CLOSE state
+					if (pss->stopping)
+					{
+						pss->state = CLOSE;
+					}
+					else
+					{
+						// If the process failed, retry
+						if (pss->iteration < NUM_RETRY)
+						{
+							pss->iteration++;
+						}
+						// Otherwise move onto next proxy server
+						else
+						{
+							// Send current progress
+							pss->progress = (6 * pss->current->idx) + 1;
+							pss->nwa_back++;
+							pss->next_write_action[pss->nwa_back%BUFFER_SIZE] = SEND_PROGRESS;
+							pss->nwa_cur++;
+
+							pss->iteration = 1;
+							pss->current = pss->current->next;
+							pss->state = PREP_TEMP_CONFIG_FILE;
+						}
+					}
+				}
+			}
+
+			break;
+
+		case GET_PROXY_CONNECTIVITY:
+			// If we are stopping, kill the current child process
+			// if one has been executed
+			if (pss->stopping)
+			{
+				if (pss->pid != 0)
+				{
+					kill(pss->pid, SIGKILL);
+				}
+			}
+
+			// Execute child process
+			rv = execute_process(pss->infd, pss->outfd, pss->errfd, &pss->pid
+					, args_proxy_temp_connectivity, &status, pss);
+
+			if (rv < 0)
+			{
+				pss->nwa_back++;
+				pss->next_notification[pss->nwa_back%BUFFER_SIZE].nt = ERROR;
+				pss->next_notification[pss->nwa_back%BUFFER_SIZE].code = errno;
+				sprintf(pss->next_notification[pss->nwa_back%BUFFER_SIZE].message,
+						"ERROR (%d): Could not start external process.\n", errno);
+				pss->next_write_action[pss->nwa_back%BUFFER_SIZE] = SEND_NOTIFICATION;
+				pss->nwa_cur++;
+				lwsl_err(pss->next_notification[pss->nwa_back%BUFFER_SIZE].message);
+				pss->state = CLOSE;
+				return;
+			}
+			else if (rv == 0)
+			{
+				// Process has not finished (callback needs to be called again)
+			}
+			else
+			{
+				// Process finished, cleanup and move onto next step
+				pss->outfd[0] = 0;
+				pss->outfd[1] = 0;
+				pss->infd[0] = 0;
+				pss->infd[1] = 0;
+				pss->errfd[0] = 0;
+				pss->errfd[1] = 0;
+				pss->pid = 0;
+
+				// Send current progress
+				pss->progress = (6 * (pss->current->idx - 1)) + pss->iteration + 4;
+				pss->nwa_back++;
+				pss->next_write_action[pss->nwa_back%BUFFER_SIZE] = SEND_PROGRESS;
+				pss->nwa_cur++;
+
+				// Get return value, interation and send through WebSocket connection
+				pss->test_information.index = pss->current->num;
+				pss->test_information.return_value = WEXITSTATUS(status);
+				pss->test_information.iteration = pss->iteration;
+
+				pss->nwa_back++;
+				pss->next_write_action[pss->nwa_back%BUFFER_SIZE] = SEND_PROXY_CONNECT;
+				pss->nwa_cur++;
+
+				// If process completed successfully, move onto the next proxy server
+				if (status == 0)
+				{
+					// Send current progress
+					pss->progress = (6 * pss->current->idx) + 1;
+					pss->nwa_back++;
+					pss->next_write_action[pss->nwa_back%BUFFER_SIZE] = SEND_PROGRESS;
+					pss->nwa_cur++;
+
+					// Move onto next proxy server
 					pss->iteration = 1;
 					pss->current = pss->current->next;
 					pss->state = PREP_TEMP_CONFIG_FILE;
 				}
+				// Otherwise send error message and abort
 				else
 				{
 					// If we are stopping, go to CLOSE state
@@ -1811,7 +2086,7 @@ void test_config(struct per_session_data__yi_hack_v3_test_proxy *pss)
 		case INIT:
 			pss->iteration = 1;
 			pss->progress = 1;
-			pss->progress_num = 8;
+			pss->progress_num = 14;
 			pss->state = GET_INFO;
 
 			pss->nwa_back++;
@@ -1881,7 +2156,7 @@ void test_config(struct per_session_data__yi_hack_v3_test_proxy *pss)
 					pss->nwa_cur++;
 
 					pss->iteration = 1;
-					pss->state = GET_PROXY_INFO;
+					pss->state = GET_CONNECTIVITY;
 				}
 				else
 				{
@@ -1903,6 +2178,92 @@ void test_config(struct per_session_data__yi_hack_v3_test_proxy *pss)
 						pss->nwa_cur++;
 						lwsl_err(pss->next_notification[pss->nwa_back%BUFFER_SIZE]
 								.message);
+						pss->state = CLOSE;
+					}
+				}
+			}
+
+			break;
+
+		case GET_CONNECTIVITY:
+			// Execute child process
+			rv = execute_process(pss->infd, pss->outfd, pss->errfd, &pss->pid
+					, args_proxy_connectivity, &status, pss);
+
+			if (rv < 0)
+			{
+				pss->nwa_back++;
+				pss->next_notification[pss->nwa_back%BUFFER_SIZE].nt = ERROR;
+				pss->next_notification[pss->nwa_back%BUFFER_SIZE].code = errno;
+				sprintf(pss->next_notification[pss->nwa_back%BUFFER_SIZE].message,
+						"ERROR (%d): Could not start external process.\n", errno);
+				pss->next_write_action[pss->nwa_back%BUFFER_SIZE] = SEND_NOTIFICATION;
+				pss->nwa_cur++;
+				lwsl_err(pss->next_notification[pss->nwa_back%BUFFER_SIZE].message);
+				pss->state = CLOSE;
+				return;
+			}
+			else if (rv == 0)
+			{
+				// Process has not finished (callback needs to be called again)
+			}
+			else
+			{
+				// Process finished, cleanup and move onto next step
+				pss->outfd[0] = 0;
+				pss->outfd[1] = 0;
+				pss->infd[0] = 0;
+				pss->infd[1] = 0;
+				pss->errfd[0] = 0;
+				pss->errfd[1] = 0;
+				pss->pid = 0;
+
+				// Send current progress
+				pss->progress = pss->iteration + 4;
+				pss->nwa_back++;
+				pss->next_write_action[pss->nwa_back%BUFFER_SIZE] = SEND_PROGRESS;
+				pss->nwa_cur++;
+
+				// Get return value, interation and send through WebSocket connection
+				pss->test_information.return_value = WEXITSTATUS(status);
+				pss->test_information.iteration = pss->iteration;
+
+				pss->nwa_back++;
+				pss->next_write_action[pss->nwa_back%BUFFER_SIZE] = SEND_CONNECT;
+				pss->nwa_cur++;
+
+				// If process completed successfully, move onto the next proxy server
+				if (status == 0)
+				{
+					// Send current progress
+					pss->progress = 7;
+					pss->nwa_back++;
+					pss->next_write_action[pss->nwa_back%BUFFER_SIZE] = SEND_PROGRESS;
+					pss->nwa_cur++;
+
+					// Move onto next step
+					pss->iteration = 1;
+					pss->state = GET_PROXY_INFO;
+				}
+				// Otherwise send error message and abort
+				else
+				{
+					// If the process failed, retry
+					if (pss->iteration < NUM_RETRY)
+					{
+						pss->iteration++;
+					}
+					// Otherwise move onto next proxy server
+					else
+					{
+						pss->nwa_back++;
+						pss->next_notification[pss->nwa_back%BUFFER_SIZE].nt = ERROR;
+						sprintf(pss->next_notification[pss->nwa_back%BUFFER_SIZE].message,
+								"Could not connect to api.xiaoyi.com, "
+								"ensure that the configured proxy servers are operational.\n");
+						pss->next_write_action[pss->nwa_back%BUFFER_SIZE] = SEND_NOTIFICATION;
+						pss->nwa_cur++;
+						lwsl_err(pss->next_notification[pss->nwa_back%BUFFER_SIZE].message);
 						pss->state = CLOSE;
 					}
 				}
@@ -1948,7 +2309,7 @@ void test_config(struct per_session_data__yi_hack_v3_test_proxy *pss)
 				pss->pid = 0;
 
 				// Send current progress
-				pss->progress = pss->iteration + 4;
+				pss->progress = pss->iteration + 7;
 				pss->nwa_back++;
 				pss->next_write_action[pss->nwa_back%BUFFER_SIZE] = SEND_PROGRESS;
 				pss->nwa_cur++;
@@ -1965,7 +2326,7 @@ void test_config(struct per_session_data__yi_hack_v3_test_proxy *pss)
 				if (status == 0)
 				{
 					// About 90% through the test, only cleanup to go
-					pss->progress = 7;
+					pss->progress = 10;
 					pss->nwa_back++;
 					pss->next_write_action[pss->nwa_back%BUFFER_SIZE] = SEND_PROGRESS;
 					pss->nwa_cur++;
@@ -1989,7 +2350,7 @@ void test_config(struct per_session_data__yi_hack_v3_test_proxy *pss)
 					}
 
 					pss->iteration = 1;
-					pss->state = CLOSE;
+					pss->state = GET_PROXY_CONNECTIVITY;
 				}
 				// Otherwise send error message and abort
 				else
@@ -2017,11 +2378,97 @@ void test_config(struct per_session_data__yi_hack_v3_test_proxy *pss)
 
 			break;
 
+		case GET_PROXY_CONNECTIVITY:
+			// Execute child process
+			rv = execute_process(pss->infd, pss->outfd, pss->errfd, &pss->pid
+					, args_proxy_connectivity, &status, pss);
+
+			if (rv < 0)
+			{
+				pss->nwa_back++;
+				pss->next_notification[pss->nwa_back%BUFFER_SIZE].nt = ERROR;
+				pss->next_notification[pss->nwa_back%BUFFER_SIZE].code = errno;
+				sprintf(pss->next_notification[pss->nwa_back%BUFFER_SIZE].message,
+						"ERROR (%d): Could not start external process.\n", errno);
+				pss->next_write_action[pss->nwa_back%BUFFER_SIZE] = SEND_NOTIFICATION;
+				pss->nwa_cur++;
+				lwsl_err(pss->next_notification[pss->nwa_back%BUFFER_SIZE].message);
+				pss->state = CLOSE;
+				return;
+			}
+			else if (rv == 0)
+			{
+				// Process has not finished (callback needs to be called again)
+			}
+			else
+			{
+				// Process finished, cleanup and move onto next step
+				pss->outfd[0] = 0;
+				pss->outfd[1] = 0;
+				pss->infd[0] = 0;
+				pss->infd[1] = 0;
+				pss->errfd[0] = 0;
+				pss->errfd[1] = 0;
+				pss->pid = 0;
+
+				// Send current progress
+				pss->progress = pss->iteration + 10;
+				pss->nwa_back++;
+				pss->next_write_action[pss->nwa_back%BUFFER_SIZE] = SEND_PROGRESS;
+				pss->nwa_cur++;
+
+				// Get return value, interation and send through WebSocket connection
+				pss->test_information.return_value = WEXITSTATUS(status);
+				pss->test_information.iteration = pss->iteration;
+
+				pss->nwa_back++;
+				pss->next_write_action[pss->nwa_back%BUFFER_SIZE] = SEND_PROXY_CONNECT;
+				pss->nwa_cur++;
+
+				// If process completed successfully, move onto the next proxy server
+				if (status == 0)
+				{
+					// Send current progress
+					pss->progress = 13;
+					pss->nwa_back++;
+					pss->next_write_action[pss->nwa_back%BUFFER_SIZE] = SEND_PROGRESS;
+					pss->nwa_cur++;
+
+					// Move onto next step
+					pss->iteration = 1;
+					pss->state = CLOSE;
+				}
+				// Otherwise send error message and abort
+				else
+				{
+					// If the process failed, retry
+					if (pss->iteration < NUM_RETRY)
+					{
+						pss->iteration++;
+					}
+					// Otherwise move onto next proxy server
+					else
+					{
+						pss->nwa_back++;
+						pss->next_notification[pss->nwa_back%BUFFER_SIZE].nt = ERROR;
+						sprintf(pss->next_notification[pss->nwa_back%BUFFER_SIZE].message,
+								"Could not connect to api.xiaoyi.com through ProxyChains-ng, "
+								"ensure that the configured proxy servers are operational.\n");
+						pss->next_write_action[pss->nwa_back%BUFFER_SIZE] = SEND_NOTIFICATION;
+						pss->nwa_cur++;
+						lwsl_err(pss->next_notification[pss->nwa_back%BUFFER_SIZE].message);
+						pss->state = CLOSE;
+					}
+				}
+			}
+
+			break;
+
 		case CLOSE:
 			pss->state = IDLE;
 
 			// Finished the test
-			pss->progress = 8;
+			pss->progress = 14;
 			pss->nwa_back++;
 			pss->next_write_action[pss->nwa_back%BUFFER_SIZE] = SEND_PROGRESS;
 			pss->nwa_cur++;
@@ -2288,6 +2735,62 @@ int session_write(struct per_vhost_data__yi_hack_v3_test_proxy *vhd,
 			strcpy(pss->test_information.location, "");
 			strcpy(pss->test_information.network, "");
 			strcpy(pss->test_information.postal, "");
+			break;
+		case SEND_CONNECT:
+			// Prepare to send data in JSON format
+			n = sprintf((char *)buf, "{\n\"message\":\"SEND_CONNECT\",\n"
+					"\"index\":\"%d\",\n\"return_value\":\"%d\",\n"
+					"\"iteration\":\"%d\"\n}"
+					, pss->test_information.index, pss->test_information.return_value
+					, pss->test_information.iteration);
+
+			// Send the data
+			m = lws_write(pss->wsi, buf, n, LWS_WRITE_TEXT);
+			if (m < n)
+			{
+				pss->nwa_back++;
+				pss->next_notification[pss->nwa_back%BUFFER_SIZE].nt = ERROR;
+				pss->next_notification[pss->nwa_back%BUFFER_SIZE].code = errno;
+				sprintf(pss->next_notification[pss->nwa_back%BUFFER_SIZE].message,
+						"ERROR (%d): Error writing to yi-hack-v3_info Websocket.\n"
+						, errno);
+				pss->next_write_action[pss->nwa_back%BUFFER_SIZE] = SEND_NOTIFICATION;
+				pss->nwa_cur++;
+				lwsl_err(pss->next_notification[pss->nwa_back%BUFFER_SIZE].message);
+				return -1;
+			}
+
+			// Remove action from the FIFO buffer
+			pss->nwa_front++;
+			pss->nwa_cur--;
+			break;
+		case SEND_PROXY_CONNECT:
+			// Prepare to send data in JSON format
+			n = sprintf((char *)buf, "{\n\"message\":\"SEND_PROXY_CONNECT\",\n"
+					"\"index\":\"%d\",\n\"return_value\":\"%d\",\n"
+					"\"iteration\":\"%d\"\n}"
+					, pss->test_information.index, pss->test_information.return_value
+					, pss->test_information.iteration);
+
+			// Send the data
+			m = lws_write(pss->wsi, buf, n, LWS_WRITE_TEXT);
+			if (m < n)
+			{
+				pss->nwa_back++;
+				pss->next_notification[pss->nwa_back%BUFFER_SIZE].nt = ERROR;
+				pss->next_notification[pss->nwa_back%BUFFER_SIZE].code = errno;
+				sprintf(pss->next_notification[pss->nwa_back%BUFFER_SIZE].message,
+						"ERROR (%d): Error writing to yi-hack-v3_info Websocket.\n"
+						, errno);
+				pss->next_write_action[pss->nwa_back%BUFFER_SIZE] = SEND_NOTIFICATION;
+				pss->nwa_cur++;
+				lwsl_err(pss->next_notification[pss->nwa_back%BUFFER_SIZE].message);
+				return -1;
+			}
+
+			// Remove action from the FIFO buffer
+			pss->nwa_front++;
+			pss->nwa_cur--;
 			break;
 		case SEND_LOG:
 			// Prepare to send data in JSON format

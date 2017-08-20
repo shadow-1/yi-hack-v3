@@ -8,5 +8,5 @@ udevd --daemon
 udevadm trigger
 mount -t jffs2 /dev/mtdblock5 /home
 /home/yi-hack-v3/script/system_init.sh
-/home/base/init.sh &
+/home/base/init.sh
 
