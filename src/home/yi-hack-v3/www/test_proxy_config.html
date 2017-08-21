@@ -69,9 +69,14 @@
 			</thead>
 			<tbody>
 				<tr>
-					<td><strong>Result</strong></td>
+					<td><strong>Internet Connectivity</strong></td>
 					<td><span class=info_1>&#8213;</span> <span class=info_2>&#8213;</span> <span class=info_3>&#8213;</span></td>
 					<td><span class=proxy_info_1>&#8213;</span> <span class=proxy_info_2>&#8213;</span> <span class=proxy_info_3>&#8213;</span></td>
+				</tr>
+				<tr>
+					<td><strong>Server Connectivity</strong></td>
+					<td><span class=connect_1>&#8213;</span> <span class=connect_2>&#8213;</span> <span class=connect_3>&#8213;</span></td>
+					<td><span class=proxy_connect_1>&#8213;</span> <span class=proxy_connect_2>&#8213;</span> <span class=proxy_connect_3>&#8213;</span></td>
 				</tr>
 				<tr>
 					<td><strong>Public IP</strong></td>
@@ -287,6 +292,42 @@ function init() {
 				document.getElementsByClassName("proxy_location")[0].textContent = jso.loc;
 				document.getElementsByClassName("proxy_network")[0].textContent = jso.org;
 				document.getElementsByClassName("proxy_postal")[0].textContent = jso.postal;
+			} else if (jso.message == "SEND_CONNECT") {
+				var c;
+				if (parseInt(jso.return_value) == 0) {
+					c = "<span class=\"label label-success\">\u2714</span>";
+				} else {
+					c = "<span class=\"label label-danger\">\u2718</span>";
+				}
+				switch (parseInt(jso.iteration)) {
+					case 1:
+						document.getElementsByClassName("connect_1")[0].innerHTML = c;
+						break;
+					case 2:
+						document.getElementsByClassName("connect_2")[0].innerHTML = c;
+						break;
+					case 3:
+						document.getElementsByClassName("connect_3")[0].innerHTML = c;
+						break;
+				}
+			} else if (jso.message == "SEND_PROXY_CONNECT") {
+				var c;
+				if (parseInt(jso.return_value) == 0) {
+					c = "<span class=\"label label-success\">\u2714</span>";
+				} else {
+					c = "<span class=\"label label-danger\">\u2718</span>";
+				}
+				switch (parseInt(jso.iteration)) {
+					case 1:
+						document.getElementsByClassName("proxy_connect_1")[0].innerHTML = c;
+						break;
+					case 2:
+						document.getElementsByClassName("proxy_connect_2")[0].innerHTML = c;
+						break;
+					case 3:
+						document.getElementsByClassName("proxy_connect_3")[0].innerHTML = c;
+						break;
+				}
 			} else if (jso.message == "SEND_NOTIFICATION") {
 				var message;
 

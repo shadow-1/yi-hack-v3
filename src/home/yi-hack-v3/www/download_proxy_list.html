@@ -65,7 +65,8 @@
 					<th>#</th>
 					<th>Proxy Server</th>
 					<th>Country</th>
-					<th>Result</th>
+					<th>Proxy Connectivity</th>
+					<th>Server Connectivity</th>
 					<th> </th>
 				</tr>
 			</thead>
@@ -289,6 +290,23 @@ function save_proxy_list() {
 				table_row.getElementsByClassName("check")[0].checked = check_result;
 				table_row.getElementsByClassName("country")[0].innerHTML = country_result;
 				table_row.getElementsByClassName("proxy_" + jso.iteration)[0].innerHTML = proxy_result;
+			} else if (jso.message == "SEND_PROXY_CONNECT") {
+				var proxy_index_name;
+				var table_row;
+				var check_result;
+				var connect_result;
+				if (parseInt(jso.return_value) == 0) {
+					connect_result = "<span class=\"label label-success\">\u2714</span>";
+					check_result = true;
+					
+				} else {
+					connect_result = "<span class=\"label label-danger\">\u2718</span>";
+					check_result = false;
+				}
+				proxy_index_name = "proxy_index_" + jso.index;
+				table_row = document.getElementsByClassName(proxy_index_name)[0].parentElement.parentElement;
+				table_row.getElementsByClassName("check")[0].checked = check_result;
+				table_row.getElementsByClassName("connect_" + jso.iteration)[0].innerHTML = connect_result;
 			} else if (jso.message == "SEND_NOTIFICATION") {
 				var message;
 
@@ -325,12 +343,14 @@ function save_proxy_list() {
 				var cell3 = row.insertCell(2);
 				var cell4 = row.insertCell(3);
 				var cell5 = row.insertCell(4);
+				var cell6 = row.insertCell(5);
 				
 				cell1.innerHTML = "<span class=proxy_index_" + jso.index + ">" + jso.index + "</span>";
 				cell2.innerHTML = "<span class=proxy_line>" + jso.proxy + "</span>";
 				cell3.innerHTML = "<span class=country>&#8213;</span>"
 				cell4.innerHTML = "<span class=proxy_1>&#8213;</span> <span class=proxy_2>&#8213;</span> <span class=proxy_3>&#8213;</span>";
-				cell5.innerHTML = "<input type=\"checkbox\" value=\"\" class=check>"
+				cell5.innerHTML = "<span class=connect_1>&#8213;</span> <span class=connect_2>&#8213;</span> <span class=connect_3>&#8213;</span>";
+				cell6.innerHTML = "<input type=\"checkbox\" value=\"\" class=check>"
 			}
 		} 
 
@@ -404,4 +424,3 @@ function remove_information(x) {
 </body>
 
 </html>
-
