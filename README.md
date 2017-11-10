@@ -3,7 +3,7 @@
 This project is a collection of config files, Makefiles and scripts to allow custom firmware images to be created and deployed to extend the functionality of Xiaomi Cameras based on HiSilicon Hi3518e V200 chipset.
 
 Currently this project supports:
-* Yi Home 17CN
+* Yi Home 17CN / 27US
 * Yi 1080p Home
 * Yi Dome
 * Yi 1080p Dome
@@ -14,9 +14,9 @@ Currently this project supports:
 
 Special thanks for [GearBest](www.gearbest.com) for generously donating a Yi Dome camera so I could further develop this firmware. Without having a camera to develop on, it would not have been possible to develop past the initial firmware releases.
 Consider having a look at the following special GearBest links:
-* [Yi 1080p Dome](http://www.gearbest.com/ip-cameras/pp_469365.html?wid=11&lkid=10912088 "GearBest Yi 1080p Dome")
-* [Yi Dome](http://www.gearbest.com/ip-cameras/pp_444029.html?wid=37&lkid=10912074 "GearBest Yi Dome")
-* [Yi Home](http://www.gearbest.com/ip-cameras/pp_341365.html?wid=11&lkid=10912107 "GearBest Yi Home")
+* [Yi Home](https://www.gearbest.com/ip-cameras/pp_193393.html?lkid=11854175 "GearBest Yi Home")
+* [Yi Home 2](https://www.gearbest.com/ip-cameras/pp_340801.html?lkid=11854194 "GearBest Yi Home 2")
+* [MiJia Smart Camera](https://www.gearbest.com/ip-cameras/pp_615275.html?lkid=11854258 "GearBest MiJia Smart Camera")
 
 I would like to also thank the following projects for their efforts on other Xiaomi cameras and giving inspiration for me to develop and publish my own custom firmware.
 
@@ -62,8 +62,8 @@ This firmware includes Proxychains-ng. This allows communication between the cam
 Performance is not degraded as the cameras video/audio feed is not routed through the proxy server.
 
 ## Getting Started - Step by Step Guide
-1. Check that you have a correct Xiaomi Yi camera. Currently 3 cameras are supported: 
-* Yi Home 17CN Camera
+1. Check that you have a correct Xiaomi Yi camera. Currently 4 cameras are supported: 
+* Yi Home 17CN / 27US Camera
 * Yi 1080p Home Camera
 * Yi Dome Camera
 * Yi 1080p Dome Camera
@@ -77,7 +77,7 @@ Performance is not degraded as the cameras video/audio feed is not routed throug
 | Camera | rootfs partition | home partition | Remarks |
 | --- | --- | --- | --- |
 | **Yi Home** | - | - | Not yet supported. |
-| **Yi Home 17CN** | rootfs_y18 | home_y18 | Firmware files required for the Yi Home 17CN camera. |
+| **Yi Home 17CN / 27US** | rootfs_y18 | home_y18 | Firmware files required for the Yi Home 17CN / 27US camera. |
 | **Yi 1080p Home** | rootfs_y20 | home_y20 | Firmware files required for the Yi 1080p Home camera. |
 | **Yi Dome** | rootfs_v201 | home_v201 | Firmware files required for the Yi Dome camera. |
 | **Yi 1080p Dome** | rootfs_h20 | home_h20 | Firmware files required for the Yi 1080p Dome camera. |
@@ -165,7 +165,9 @@ Recovery images have been created to go back to stock firmware. You can download
 
 | Camera | rootfs partition | home partition | Remarks |
 | --- | --- | --- | --- |
+| **Yi Home** | rootfs | home | Stock firmware is version 1.8.7.0D_201708091510. |
 | **Yi Home 17CN** | rootfs_y18 | home_y18 | Stock firmware is version 1.8.7.0C_201705091058. |
+| **Yi Home 27US** | rootfs_y18 | home_y18 | Stock firmware is version 1.8.7.0A_201702081101. |
 | **Yi 1080p Home** | rootfs_y20 | home_y20 | Stock firmware is version 2.0.0.1A_201612051401. |
 | **Yi Dome** | rootfs_v201 | home_v201 | Stock firmware is version 1.9.1.0F_201701041701. |
 | **Yi 1080p Dome** | rootfs_h20 | home_h20 | Stock firmware is version 1.9.2.0C_201611011902. |

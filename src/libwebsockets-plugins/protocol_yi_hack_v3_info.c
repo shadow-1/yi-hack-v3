@@ -10,11 +10,20 @@
 /**
  * Constants used in the plugin.
  */
+#ifdef YI_HOME
+#define HACK_INFO_FILE "/usr/yi-hack-v3/.hackinfo"
+#define BASE_VERSION_FILE "/home/version"
+#define HACK_CONFIG_FILE "/usr/yi-hack-v3/etc/system.conf"
+#define PROXYCHAINSNG_CONFIG_FILE "/usr/yi-hack-v3/etc/proxychains.conf"
+#define HOSTNAME "/usr/yi-hack-v3/etc/hostname"
+#else
 #define HACK_INFO_FILE "/home/yi-hack-v3/.hackinfo"
 #define BASE_VERSION_FILE "/home/homever"
 #define HACK_CONFIG_FILE "/home/yi-hack-v3/etc/system.conf"
 #define PROXYCHAINSNG_CONFIG_FILE "/home/yi-hack-v3/etc/proxychains.conf"
 #define HOSTNAME "/home/yi-hack-v3/etc/hostname"
+#endif
+
 #define NOTIFICATION_MAX_LENGTH 200
 #define BUFFER_SIZE 10
 #define CHUNK_SIZE 200
@@ -170,6 +179,9 @@ int protocol_init(struct per_vhost_data__yi_hack_v3_info *vhd, char *buf)
 	// Close the info file
 	lws_vfs_file_close(&fop_fd);
 
+#ifdef YI_HOME
+	strcpy(vhd->base_version, "-");
+#else
 	// Open the base version file
 	fop_fd = lws_vfs_file_open(vhd->fops_plat, BASE_VERSION_FILE, &flags);
 
@@ -199,7 +211,7 @@ int protocol_init(struct per_vhost_data__yi_hack_v3_info *vhd, char *buf)
 
 	// Close the base version file
 	lws_vfs_file_close(&fop_fd);
-	
+#endif	
 	// Open the hostname file
 	fop_fd = lws_vfs_file_open(vhd->fops_plat, HOSTNAME, &flags);
 

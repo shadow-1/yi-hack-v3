@@ -16,7 +16,12 @@
 /**
  * Constants used in the plugin.
  */
+#ifdef YI_HOME
+#define PROXYCHAINSNG_CONFIG_FILE "/usr/yi-hack-v3/etc/proxychains.conf"
+#else
 #define PROXYCHAINSNG_CONFIG_FILE "/home/yi-hack-v3/etc/proxychains.conf"
+#endif
+
 #define TEMP_PROXYCHAINSNG_CONFIG_FILE "/tmp/temp_proxychains.conf"
 #define TEMP_DOWNLOAD_FILE "/tmp/temp_proxy_list.txt"
 #define NOTIFICATION_MAX_LENGTH 200

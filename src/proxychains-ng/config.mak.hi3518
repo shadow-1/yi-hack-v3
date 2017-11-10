@@ -1,0 +1,11 @@
+CC=arm-hisiv100nptl-linux-gcc
+prefix=./_install
+exec_prefix=./_install
+bindir=./_install/bin
+libdir=/usr/yi-hack-v3/lib
+includedir=./_install/include
+sysconfdir=/usr/yi-hack-v3/etc
+USER_CFLAGS=-I/opt/hisi-linux-nptl/arm-hisiv100-linux/target/usr/include -L/opt/hisi-linux-nptl/arm-hisiv100-linux/target/usr/lib
+USER_LDFLAGS=
+AR=arm-hisiv100nptl-linux-ar
+RANLIB=arm-hisiv100nptl-linux-ranlib
