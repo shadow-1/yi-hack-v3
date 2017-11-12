@@ -1,15 +1,21 @@
 #!/bin/sh
 
-CONF_FILE="/home/yi-hack-v3/etc/system.conf"
+CONF_FILE="/yi-hack-v3/etc/system.conf"
+
+if [ -d "/usr/yi-hack-v3" ]; then
+        YI_HACK_V3_PREFIX="/usr"
+elif [ -d "/home/yi-hack-v3" ]; then
+        YI_HACK_V3_PREFIX="/home"
+fi
 
 get_config()
 {
 	key=$1
-	grep $1 $CONF_FILE | cut -d "=" -f2
+	grep $1 $YI_HACK_V3_PREFIX$CONF_FILE | cut -d "=" -f2
 }
                 
 if [[ $(get_config PROXYCHAINSNG) == "yes" ]] ; then
-	/home/yi-hack-v3/bin/proxychains4 ./cloudAPI_real "$@"
+	$YI_HACK_V3_PREFIX/yi-hack-v3/bin/proxychains4 ./cloudAPI_real "$@"
 else
 	./cloudAPI_real "$@"
 fi

@@ -1,22 +1,33 @@
 #!/bin/sh
 
-ARCHIVE_FILE="/home/yi-hack-v3/yi-hack-v3.7z"
-DESTDIR="/home/yi-hack-v3"
-UDHCPC_SCRIPT_DEST="/home/app/script/default.script"
+if [ -d "/usr/yi-hack-v3" ]; then
+        YI_HACK_V3_PREFIX="/usr"
+	YI_PREFIX="/home"
+	UDHCPC_SCRIPT_DEST="/home/default.script"
+elif [ -d "/home/yi-hack-v3" ]; then
+        YI_HACK_V3_PREFIX="/home"
+	YI_PREFIX="/home/app"
+	UDHCPC_SCRIPT_DEST="/home/app/script/default.script"
+fi
+
+ARCHIVE_FILE="$YI_HACK_V3_PREFIX/yi-hack-v3/yi-hack-v3.7z"
+DESTDIR="$YI_HACK_V3_PREFIX/yi-hack-v3"
 DHCP_SCRIPT_DEST="/home/app/script/wifidhcp.sh"
-UDHCP_SCRIPT="/home/yi-hack-v3/default.script"
-DHCP_SCRIPT="/home/yi-hack-v3/wifidhcp.sh"
+UDHCP_SCRIPT="$YI_HACK_V3_PREFIX/yi-hack-v3/default.script"
+DHCP_SCRIPT="$YI_HACK_V3_PREFIX/yi-hack-v3/wifidhcp.sh"
 
 if [ -f $ARCHIVE_FILE ]; then
 	/home/base/tools/7za x $ARCHIVE_FILE -o$DESTDIR
 	rm $ARCHIVE_FILE
 fi
 
-if [ ! -f /home/app/cloudAPI_real ]; then
-	mv /home/app/cloudAPI /home/app/cloudAPI_real
-	cp /home/yi-hack-v3/cloudAPI /home/app/
-	rm $DHCP_SCRIPT_DEST
+if [ ! -f $YI_PREFIX/cloudAPI_real ]; then
+	mv $YI_PREFIX/cloudAPI $YI_PREFIX/cloudAPI_real
+	cp $YI_HACK_V3_PREFIX/yi-hack-v3/cloudAPI $YI_PREFIX/
         rm $UDHCPC_SCRIPT_DEST
-        cp $DHCP_SCRIPT $DHCP_SCRIPT_DEST
         cp $UDHCP_SCRIPT $UDHCPC_SCRIPT_DEST
+	if [ -f $DHCP_SCRIPT_DEST ]; then
+		rm $DHCP_SCRIPT_DEST
+		cp $DHCP_SCRIPT $DHCP_SCRIPT_DEST
+	fi
 fi

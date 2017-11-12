@@ -1,17 +1,23 @@
 #!/bin/sh
 
-CONF_FILE="/home/yi-hack-v3/etc/system.conf"
+CONF_FILE="/yi-hack-v3/etc/system.conf"
+
+if [ -d "/usr/yi-hack-v3" ]; then
+        YI_HACK_V3_PREFIX="/usr"
+elif [ -d "/home/yi-hack-v3" ]; then
+        YI_HACK_V3_PREFIX="/home"
+fi
 
 get_config()
 {
         key=$1
-        grep $1 $CONF_FILE | cut -d "=" -f2
+        grep $1 $YI_HACK_V3_PREFIX$CONF_FILE | cut -d "=" -f2
 }
 
-export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:/home/lib:/home/yi-hack-v3/lib
-export PATH=$PATH:/home/base/tools:/home/yi-hack-v3/bin
+export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:/home/lib:$YI_HACK_V3_PREFIX/yi-hack-v3/lib
+export PATH=$PATH:/home/base/tools:$YI_HACK_V3_PREFIX/yi-hack-v3/bin
 
-hostname -F /home/yi-hack-v3/etc/hostname
+hostname -F $YI_HACK_V3_PREFIX/yi-hack-v3/etc/hostname
 
 if [[ $(get_config HTTPD) == "yes" ]] ; then
 	lwsws -D
@@ -27,4 +33,6 @@ fi
 
 if [ -f "/tmp/sd/startup.sh" ]; then
 	/tmp/sd/startup.sh
+elif [ -f "/home/hd1/startup.sh" ]; then
+	/home/hd1/startup.sh
 fi
