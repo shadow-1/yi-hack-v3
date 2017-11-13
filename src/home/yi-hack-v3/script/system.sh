@@ -14,8 +14,13 @@ get_config()
         grep $1 $YI_HACK_V3_PREFIX$CONF_FILE | cut -d "=" -f2
 }
 
-export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:/home/lib:$YI_HACK_V3_PREFIX/yi-hack-v3/lib
-export PATH=$PATH:/home/base/tools:$YI_HACK_V3_PREFIX/yi-hack-v3/bin
+if [ -d "/usr/yi-hack-v3" ]; then
+	export LD_LIBRARY_PATH=/home/libusr:$LD_LIBRARY_PATH:/usr/yi-hack-v3/lib
+	export PATH=$PATH:/usr/yi-hack-v3/bin
+elif [ -d "/home/yi-hack-v3" ]; then
+	export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:/home/lib:/home/yi-hack-v3/lib
+	export PATH=$PATH:/home/base/tools:/home/yi-hack-v3/bin
+fi
 
 hostname -F $YI_HACK_V3_PREFIX/yi-hack-v3/etc/hostname
 
