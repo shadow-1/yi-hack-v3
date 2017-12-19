@@ -3,7 +3,7 @@
 This project is a collection of config files, Makefiles and scripts to allow custom firmware images to be created and deployed to extend the functionality of Xiaomi Cameras based on HiSilicon Hi3518e V200 chipset.
 
 Currently this project supports:
-* Yi Home 17CN / 27US
+* Yi Home 17CN / 27US / 47US
 * Yi 1080p Home
 * Yi Dome
 * Yi 1080p Dome
@@ -51,7 +51,8 @@ The supported cameras have the following features by default:
 * Local video storage on microSD card.
 
 This firmware includes:
-* Telnet server - _Enabled by default._
+* SSH server - _Enabled by default._
+* Telnet server - _Disabled by default._
 * FTP server - _Enabled by default._
 * Web server - _Enabled by default._
 * Proxychains-ng - _Enabled by default. Useful if the camera is region locked._
@@ -63,7 +64,7 @@ Performance is not degraded as the cameras video/audio feed is not routed throug
 
 ## Getting Started - Step by Step Guide
 1. Check that you have a correct Xiaomi Yi camera. Currently 4 cameras are supported: 
-* Yi Home 17CN / 27US Camera
+* Yi Home 17CN / 27US / 47US Camera
 * Yi 1080p Home Camera
 * Yi Dome Camera
 * Yi 1080p Dome Camera
@@ -77,7 +78,7 @@ Performance is not degraded as the cameras video/audio feed is not routed throug
 | Camera | rootfs partition | home partition | Remarks |
 | --- | --- | --- | --- |
 | **Yi Home** | - | - | Not yet supported. |
-| **Yi Home 17CN / 27US** | rootfs_y18 | home_y18 | Firmware files required for the Yi Home 17CN / 27US camera. |
+| **Yi Home 17CN / 27US / 47US** | rootfs_y18 | home_y18 | Firmware files required for the Yi Home 17CN / 27US / 47US camera. |
 | **Yi 1080p Home** | rootfs_y20 | home_y20 | Firmware files required for the Yi 1080p Home camera. |
 | **Yi Dome** | rootfs_v201 | home_v201 | Firmware files required for the Yi Dome camera. |
 | **Yi 1080p Dome** | rootfs_h20 | home_h20 | Firmware files required for the Yi 1080p Dome camera. |
@@ -142,6 +143,11 @@ iPhone users can download the International version of the Yi Home app from the 
 
 ## Using the Camera
 
+### SSH Server
+The SSH server is on port 22.
+
+Default user is root. Password is _blank_.
+
 ### Telnet Server
 The telnet server is on port 23.
 
@@ -167,11 +173,10 @@ Recovery images have been created to go back to stock firmware. You can download
 | --- | --- | --- | --- |
 | **Yi Home** | rootfs | home | Stock firmware is version 1.8.7.0D_201708091510. |
 | **Yi Home 17CN** | rootfs_y18 | home_y18 | Stock firmware is version 1.8.7.0C_201705091058. |
-| **Yi Home 27US** | rootfs_y18 | home_y18 | Stock firmware is version 1.8.7.0A_201702081101. |
+| **Yi Home 27US / 47US** | rootfs_y18 | home_y18 | Stock firmware is version 1.8.7.0A_201702081101. |
 | **Yi 1080p Home** | rootfs_y20 | home_y20 | Stock firmware is version 2.0.0.1A_201612051401. |
 | **Yi Dome** | rootfs_v201 | home_v201 | Stock firmware is version 1.9.1.0F_201701041701. |
 | **Yi 1080p Dome** | rootfs_h20 | home_h20 | Stock firmware is version 1.9.2.0C_201611011902. |
 
 ## Development
 **TODO**
-

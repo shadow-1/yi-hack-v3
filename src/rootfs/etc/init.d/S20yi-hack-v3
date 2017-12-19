@@ -1,7 +1,0 @@
-#!/bin/sh
-
-if [ -d "/usr/yi-hack-v3" ]; then
-	/usr/yi-hack-v3/script/system.sh
-elif [ -d "/home/yi-hack-v3" ]; then
-	/home/yi-hack-v3/script/system.sh
-fi

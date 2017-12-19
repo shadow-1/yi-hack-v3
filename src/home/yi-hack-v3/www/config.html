@@ -93,6 +93,16 @@
 			</label>
 		</div>
 
+		<div class="form-group">
+			<label class="col-sm-3 control-label">Dropbear Enabled</label>
+			<label class="radio-inline">
+				<input type="radio" name="DROPBEAR" id="DROPBEAR_yes" value="yes"> Yes
+			</label>
+			<label class="radio-inline">
+				<input type="radio" name="DROPBEAR" id="DROPBEAR_no" value="no"> No
+			</label>
+		</div>
+
 		<div class="form-group form-inline">
 			<label class="col-sm-3 control-label">Hostname</label>
 			<input type="text" class="form-control" id="hostname_text">
@@ -192,6 +202,12 @@ function get_appropriate_ws_url()
 				} else if (jso.ftpd_enabled == "no") {
 					document.getElementById("FTPD_no").checked = true;
 				}
+
+				if (jso.dropbear_enabled == "yes") {
+					document.getElementById("DROPBEAR_yes").checked = true;
+				} else if (jso.dropbear_enabled == "no") {
+					document.getElementById("DROPBEAR_no").checked = true;
+				}
 			} else if (jso.message == "SEND_NOTIFICATION") {
 				var message;
 
@@ -273,4 +289,3 @@ function remove_information(x) {
 </body>
 
 </html>
-

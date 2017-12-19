@@ -1,0 +1,8 @@
+#!/bin/sh
+
+mkdir /dev/pts
+mount -t devpts devpts /dev/pts
+
+udevd --daemon
+udevstart
+/usr/yi-hack-v3/script/system_init.sh

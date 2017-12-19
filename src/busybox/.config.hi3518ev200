@@ -1,7 +1,7 @@
 #
 # Automatically generated make config: don't edit
 # Busybox version: 1.27.0.git
-# Mon Jun 26 00:03:13 2017
+# Tue Dec 19 19:05:06 2017
 #
 CONFIG_HAVE_DOT_CONFIG=y
 
@@ -958,8 +958,8 @@ CONFIG_IFUPDOWN_UDHCPC_CMD_OPTIONS=""
 # CONFIG_FEATURE_POPMAILDIR_DELIVERY is not set
 # CONFIG_REFORMIME is not set
 # CONFIG_FEATURE_REFORMIME_COMPAT is not set
-# CONFIG_SENDMAIL is not set
-CONFIG_FEATURE_MIME_CHARSET=""
+CONFIG_SENDMAIL=y
+CONFIG_FEATURE_MIME_CHARSET="us-ascii"
 
 #
 # Process Utilities

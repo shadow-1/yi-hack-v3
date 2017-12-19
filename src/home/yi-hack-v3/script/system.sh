@@ -36,6 +36,10 @@ if [[ $(get_config FTPD) == "yes" ]] ; then
 	tcpsvd -vE 0.0.0.0 21 ftpd -w &
 fi
 
+if [[ $(get_config DROPBEAR) == "yes" ]] ; then
+        dropbear
+fi
+
 if [ -f "/tmp/sd/startup.sh" ]; then
 	/tmp/sd/startup.sh
 elif [ -f "/home/hd1/startup.sh" ]; then

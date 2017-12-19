@@ -10,20 +10,11 @@
 /**
  * Constants used in the plugin.
  */
-#ifdef YI_HOME
-#define HACK_INFO_FILE "/usr/yi-hack-v3/.hackinfo"
-#define BASE_VERSION_FILE "/home/version"
-#define HACK_CONFIG_FILE "/usr/yi-hack-v3/etc/system.conf"
-#define PROXYCHAINSNG_CONFIG_FILE "/usr/yi-hack-v3/etc/proxychains.conf"
-#define HOSTNAME "/usr/yi-hack-v3/etc/hostname"
-#else
 #define HACK_INFO_FILE "/home/yi-hack-v3/.hackinfo"
 #define BASE_VERSION_FILE "/home/homever"
 #define HACK_CONFIG_FILE "/home/yi-hack-v3/etc/system.conf"
 #define PROXYCHAINSNG_CONFIG_FILE "/home/yi-hack-v3/etc/proxychains.conf"
 #define HOSTNAME "/home/yi-hack-v3/etc/hostname"
-#endif
-
 #define NOTIFICATION_MAX_LENGTH 200
 #define BUFFER_SIZE 10
 #define CHUNK_SIZE 200
@@ -110,6 +101,7 @@ struct per_session_data__yi_hack_v3_info
 	unsigned char httpd_enabled[4];
 	unsigned char telnetd_enabled[4];
 	unsigned char ftpd_enabled[4];
+	unsigned char dropbear_enabled[4];
 };
 
 /**
@@ -179,9 +171,6 @@ int protocol_init(struct per_vhost_data__yi_hack_v3_info *vhd, char *buf)
 	// Close the info file
 	lws_vfs_file_close(&fop_fd);
 
-#ifdef YI_HOME
-	strcpy(vhd->base_version, "-");
-#else
 	// Open the base version file
 	fop_fd = lws_vfs_file_open(vhd->fops_plat, BASE_VERSION_FILE, &flags);
 
@@ -211,7 +200,7 @@ int protocol_init(struct per_vhost_data__yi_hack_v3_info *vhd, char *buf)
 
 	// Close the base version file
 	lws_vfs_file_close(&fop_fd);
-#endif	
+	
 	// Open the hostname file
 	fop_fd = lws_vfs_file_open(vhd->fops_plat, HOSTNAME, &flags);
 
@@ -259,6 +248,7 @@ void session_init(struct per_session_data__yi_hack_v3_info *pss)
 	strcpy(pss->httpd_enabled, "");
 	strcpy(pss->telnetd_enabled, "");
 	strcpy(pss->ftpd_enabled, "");
+	strcpy(pss->dropbear_enabled, "");
 }
 
 /**
@@ -318,9 +308,10 @@ int session_write(struct lws *wsi, struct per_vhost_data__yi_hack_v3_info *vhd,
 			// Prepare to send data in JSON format
 			n = sprintf((char *)buf, "{\n\"message\":\"SEND_CONFIG\",\n\""
 					"proxychainsng_enabled\":\"%s\",\n\"httpd_enabled\":\"%s\""
-					",\n\"telnetd_enabled\":\"%s\",\n\"ftpd_enabled\":\"%s\"\n}"
+					",\n\"telnetd_enabled\":\"%s\",\n\"ftpd_enabled\":\"%s\""
+					",\n\"dropbear_enabled\":\"%s\"\n}"
 					, pss->proxychainsng_enabled, pss->httpd_enabled
-					, pss->telnetd_enabled, pss->ftpd_enabled);
+					, pss->telnetd_enabled, pss->ftpd_enabled, pss->dropbear_enabled);
 
 			// Send the data
 			m = lws_write(wsi, buf, n, LWS_WRITE_TEXT);
@@ -583,6 +574,18 @@ int session_read(struct per_vhost_data__yi_hack_v3_info *vhd,
 						strcpy(pss->ftpd_enabled, token);
 				}
 			}
+			// If "DROPBEAR" has been read before the '=' character
+			else if (strcmp(token,"DROPBEAR") == 0)
+			{
+				// Read the value that is after the '=' character
+				token = strtok(NULL, "=\n");
+				if (token != NULL)
+				{
+					// If "yes" or "no" were read, store the value
+					if (strcmp(token, "yes") || strcmp(token, "no"))
+						strcpy(pss->dropbear_enabled, token);
+				}
+			}
 			// Split config file by following '=' or '\n' (on the next line)
 			token = strtok(NULL, "=\n");
 		}
@@ -650,6 +653,18 @@ int session_read(struct per_vhost_data__yi_hack_v3_info *vhd,
 						strcpy(pss->ftpd_enabled, token);
 				}
 			}
+			// If dropbear enabled is being read
+			else if (strcmp(token,"dropbear_enabled") == 0)
+			{
+				// Read the value that is after the '=' character
+				token = strtok(NULL, "=\n");
+				if (token != NULL)
+				{
+					// If "yes" or "no" was read, store the value
+					if (strcmp(token, "yes") || strcmp(token, "no"))
+						strcpy(pss->dropbear_enabled, token);
+				}
+			}
 			// If the hostname is being read
 			else if (strcmp(token,"hostname") == 0)
 			{
@@ -697,8 +712,9 @@ int session_read(struct per_vhost_data__yi_hack_v3_info *vhd,
 
 		// Prepare to save config file
 		n = sprintf((char *)buf, "PROXYCHAINSNG=%s\nHTTPD=%s\nTELNETD=%s\nFTPD=%s"
+				"\nDROPBEAR=%s"
 				, pss->proxychainsng_enabled, pss->httpd_enabled, pss->telnetd_enabled
-				, pss->ftpd_enabled);
+				, pss->ftpd_enabled, pss->dropbear_enabled);
 
 		if (n != strlen(buf))
 		{
