@@ -7,8 +7,8 @@ set_path_before()
 	[ -d $1 ] && PATH="$1:$PATH"
 }
 
-PATH="/usr/bin:/usr/sbin:/bin:/sbin:/usr/yi-hack-v3/bin:/usr/yi-hack-v3/sbin"
-LD_LIBRARY_PATH="/home/bt:/home/libusr:/usr/local/lib:/usr/lib:/usr/yi-hack-v3/lib"
+PATH="/usr/bin:/usr/sbin:/bin:/sbin:/usr/yi-hack-v3/bin:/usr/yi-hack-v3/sbin:/home/hd1/yi-hack-v3/bin:/home/hd1/yi-hack-v3/sbin"
+LD_LIBRARY_PATH="/home/bt:/home/libusr:/usr/local/lib:/usr/lib:/usr/yi-hack-v3/lib:/home/hd1/yi-hack-v3/lib"
 
 set_path_before /usr/local/sbin
 set_path_before /usr/local/bin

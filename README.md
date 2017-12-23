@@ -32,13 +32,14 @@ I would like to also thank the following projects for their efforts on other Xia
 - [Cameras that are Region Locked to Mainland China](#cameras-that-are-region-locked-to-mainland-china)
 - [Getting Started - Step by Step Guide](#getting-started---step-by-step-guide)
 - [Which Smartphone App to use?](#which-smartphone-app-to-use)
-    - [Chinese Version of the Camera](#chinese-version-of-the-camera)
-    - [International Version of the Camera](#international-version-of-the-camera)
+   - [Chinese Version of the Camera](#chinese-version-of-the-camera)
+   - [International Version of the Camera](#international-version-of-the-camera)
 - [Using the Camera](#using-the-camera)
-    - [Telnet Server](#telnet-server)
-    - [FTP Server](#ftp-server)
-    - [Startup Shell Script](#startup-shell-script)
-    - [Which Version is Installed?](#which-version-is-installed)
+   - [Telnet Server](#telnet-server)
+   - [FTP Server](#ftp-server)
+   - [Startup Shell Script](#startup-shell-script)
+   - [External Programs and Libraries](#external-programs-and-libraries)
+   - [Which Version is Installed?](#which-version-is-installed)
 - [Going Back to Stock Firmware](#going-back-to-stock-firmware)
 - [Development](#development)
 
@@ -101,7 +102,7 @@ Performance is not degraded as the cameras video/audio feed is not routed throug
 
 11. Go in the browser and access the web interface of the camera as a website. By default, the hostname of the camera is `yi-hack-v3`. Access the web interface by entering the following in your web browser: http://yi-hack-v3 
 
-Depending upon your network setup, accessing the web interface with the hostname may not work. In this case, the IP address of the camera has to be found. This can be found on most routers. Alternatively you can install an app on your phone to scan your wifi network. Android users can install "Network Scanner" and run it to find the IP address of the camera. e.g. 192.168.1.5. The camera should be listed as “Shenzhen Zowee Technology Co. Ltd”. Access the web interface by entering the IP address of the came in a web browser. e.g. http://192.168.1.5
+Depending upon your network setup, accessing the web interface with the hostname may not work. In this case, the IP address of the camera has to be found. This can be found on most routers. Alternatively you can install an app on your phone to scan your wifi network. Android users can install "Network Scanner" and run it to find the IP address of the camera. e.g. 192.168.1.5. The camera should be listed as . Access the web interface by entering the IP address of the came in a web browser. e.g. http://192.168.1.5
 
 **_IMPORTANT: If you have multiple cameras. It is important to configure each camera with a unique hostname. Otherwise the web interface will only be accessible by IP address. The hostname can be configured from the web interface of the camera on the "System Config" page._**
 
@@ -159,9 +160,27 @@ The FTP server is on port 21.
 Default user is root. Password is _blank_.
 
 ### Startup Shell Script
-On the microSD card. The following shell script is executed after the camera has booted up:
+On the microSD card. The following shell script is executed after the camera has booted up within a folder named `yi-hack-v3`:
 
-`startup.sh`
+```
+startup.sh
+```
+
+### External Programs and Libraries
+Xiaomi cameras have very limited free space available for additional programs or libraries. However these can be stored on the microSD card where they can be utilised from there.
+
+Place additional programs compiled for the camera in either of these folders on the microSD card:
+
+```
+yi-hack-v3\bin
+yi-hack-v3\sbin
+```
+
+Place additional libraries compiled for the camera in the following folder on the microSD card:
+
+```
+yi-hack-v3\lib
+```
 
 ### Which Version is Installed?
 The base firmware (Xiaomi firmware) version and y-hack-v3 firmware version is accessible through the webinterface on the About page.
