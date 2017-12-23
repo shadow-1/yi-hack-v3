@@ -249,6 +249,7 @@ function apply() {
 	var httpd_enabled;
 	var telnetd_enabled;
 	var ftpd_enabled;
+	var dropbear_enabled;
 
 	if (document.getElementById("PROXYCHAINSNG_yes").checked == true) {
 		proxychainsng_enabled = "yes";
@@ -273,8 +274,14 @@ function apply() {
 	} else {
 		ftpd_enabled = "no";
 	}
+
+	if (document.getElementById("DROPBEAR_yes").checked == true) {
+                dropbear_enabled = "yes";
+        } else {
+                dropbear_enabled = "no";
+        }
 	
-	message = "SAVE_CONFIG\nproxychainsng_enabled=" + proxychainsng_enabled + "\nhttpd_enabled=" + httpd_enabled + "\ntelnetd_enabled=" + telnetd_enabled + "\nftpd_enabled=" + ftpd_enabled + "\nhostname=" + document.getElementById("hostname_text").value;
+	message = "SAVE_CONFIG\nproxychainsng_enabled=" + proxychainsng_enabled + "\nhttpd_enabled=" + httpd_enabled + "\ntelnetd_enabled=" + telnetd_enabled + "\nftpd_enabled=" + ftpd_enabled + "\ndropbear_enabled=" + dropbear_enabled + "\nhostname=" + document.getElementById("hostname_text").value;
 
 	socket_info.send(message);
 }

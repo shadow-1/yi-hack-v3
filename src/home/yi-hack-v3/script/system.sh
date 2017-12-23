@@ -16,10 +16,10 @@ get_config()
 
 if [ -d "/usr/yi-hack-v3" ]; then
 	export LD_LIBRARY_PATH=/home/libusr:$LD_LIBRARY_PATH:/usr/yi-hack-v3/lib
-	export PATH=$PATH:/usr/yi-hack-v3/bin
+	export PATH=$PATH:/usr/yi-hack-v3/bin:/usr/yi-hack-v3/sbin
 elif [ -d "/home/yi-hack-v3" ]; then
 	export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:/home/lib:/home/yi-hack-v3/lib
-	export PATH=$PATH:/home/base/tools:/home/yi-hack-v3/bin
+	export PATH=$PATH:/home/base/tools:/home/yi-hack-v3/bin:/home/yi-hack-v3/sbin
 fi
 
 hostname -F $YI_HACK_V3_PREFIX/yi-hack-v3/etc/hostname
@@ -33,11 +33,11 @@ if [[ $(get_config TELNETD) == "yes" ]] ; then
 fi
 
 if [[ $(get_config FTPD) == "yes" ]] ; then
-	tcpsvd -vE 0.0.0.0 21 ftpd -w &
+	pure-ftpd -B
 fi
 
 if [[ $(get_config DROPBEAR) == "yes" ]] ; then
-        dropbear
+        dropbear -R
 fi
 
 if [ -f "/tmp/sd/startup.sh" ]; then

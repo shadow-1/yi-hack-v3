@@ -15,8 +15,8 @@ Currently this project supports:
 Special thanks for [GearBest](www.gearbest.com) for generously donating a Yi Dome camera so I could further develop this firmware. Without having a camera to develop on, it would not have been possible to develop past the initial firmware releases.
 Consider having a look at the following special GearBest links:
 * [Yi Home](https://www.gearbest.com/ip-cameras/pp_193393.html?lkid=11854175 "GearBest Yi Home")
-* [Yi Home 2](https://www.gearbest.com/ip-cameras/pp_340801.html?lkid=11854194 "GearBest Yi Home 2")
 * [MiJia Smart Camera](https://www.gearbest.com/ip-cameras/pp_615275.html?lkid=11854258 "GearBest MiJia Smart Camera")
+* [MiJia Smart 720p](https://www.gearbest.com/ip-cameras/pp_633879.html?lkid=12428807 "GearBest MiJia Smart 720p Camera")
 
 I would like to also thank the following projects for their efforts on other Xiaomi cameras and giving inspiration for me to develop and publish my own custom firmware.
 
@@ -63,7 +63,7 @@ This firmware includes Proxychains-ng. This allows communication between the cam
 Performance is not degraded as the cameras video/audio feed is not routed through the proxy server.
 
 ## Getting Started - Step by Step Guide
-1. Check that you have a correct Xiaomi Yi camera. Currently 4 cameras are supported: 
+1. Check that you have a correct Xiaomi Yi camera. Currently four (4) series of cameras are supported: 
 * Yi Home 17CN / 27US / 47US Camera
 * Yi 1080p Home Camera
 * Yi Dome Camera
