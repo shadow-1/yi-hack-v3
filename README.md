@@ -12,7 +12,7 @@ Currently this project supports:
 
 ## Acknowledgments
 
-Special thanks for [GearBest](www.gearbest.com) for generously donating a Yi Dome camera so I could further develop this firmware. Without having a camera to develop on, it would not have been possible to develop past the initial firmware releases.
+Special thanks for [GearBest](https://www.gearbest.com) for generously donating a Yi Dome camera so I could further develop this firmware. Without having a camera to develop on, it would not have been possible to develop past the initial firmware releases.
 Consider having a look at the following special GearBest links:
 * [Yi Home](https://www.gearbest.com/ip-cameras/pp_193393.html?lkid=11854175 "GearBest Yi Home")
 * [MiJia Smart Camera](https://www.gearbest.com/ip-cameras/pp_615275.html?lkid=11854258 "GearBest MiJia Smart Camera")
