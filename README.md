@@ -7,6 +7,7 @@ Currently this project supports:
 * Yi 1080p Home
 * Yi Dome
 * Yi 1080p Dome
+* Yi Outdoor
 
 ![Alt text](yi-cam.png?raw=true "Supported Yi Cameras")
 
@@ -65,6 +66,7 @@ Performance is not degraded as the cameras video/audio feed is not routed throug
 
 ## Getting Started - Step by Step Guide
 1. Check that you have a correct Xiaomi Yi camera. Currently four (4) series of cameras are supported: 
+* Yi Outdoor
 * Yi Home 17CN / 27US / 47US Camera
 * Yi 1080p Home Camera
 * Yi Dome Camera
@@ -83,6 +85,7 @@ Performance is not degraded as the cameras video/audio feed is not routed throug
 | **Yi 1080p Home** | rootfs_y20 | home_y20 | Firmware files required for the Yi 1080p Home camera. |
 | **Yi Dome** | rootfs_v201 | home_v201 | Firmware files required for the Yi Dome camera. |
 | **Yi 1080p Dome** | rootfs_h20 | home_h20 | Firmware files required for the Yi 1080p Dome camera. |
+| **Yi Outdoor** | rootfs_h30 | home_h30 | Firmware files required for the Yi Outdoor camera. |
 
 4. Save both files on root path of microSD card.
 
@@ -196,6 +199,7 @@ Recovery images have been created to go back to stock firmware. You can download
 | **Yi 1080p Home** | rootfs_y20 | home_y20 | Stock firmware is version 2.0.0.1A_201612051401. |
 | **Yi Dome** | rootfs_v201 | home_v201 | Stock firmware is version 1.9.1.0F_201701041701. |
 | **Yi 1080p Dome** | rootfs_h20 | home_h20 | Stock firmware is version 1.9.2.0C_201611011902. |
+| **Yi Outdoor** | rootfs_h30 | home_h30 | Stock firmware is version 3.0.0.0A_201710131102. |
 
 ## Development
 **TODO**
